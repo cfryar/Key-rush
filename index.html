@@ -227,6 +227,12 @@ function renderMute(){$("muteBtn").textContent=muted?"🔇":"🔊"}
 function powerAt(i){return i%10===9?(Math.floor(i/10)%2===0?"turbo":"shield"):null}
 let shield=false,turboUntil=0;
 
+// ---------- ghost car (solo): replay of your best run vs each rival ----------
+const GHOST_DT=0.1;
+let ghostOn=store("kr_ghost_on")!=="0",ghostRec=[];
+function loadGhost(id){try{const g=JSON.parse(store("kr_ghost_"+id)||"null");if(g&&Array.isArray(g.s)&&g.s.length>5&&g.t>0)return g}catch(e){}return null}
+function ghostAt(o,t){const s=o.samples,f=t/GHOST_DT,i=Math.floor(f);if(i>=s.length-1)return TRACK;return s[i]+(s[i+1]-s[i])*(f-i)}
+
 // ---------- state ----------
 const myId=Math.random().toString(36).slice(2,10);
 let myName=store("kr_name")||"";
@@ -249,9 +255,12 @@ function hideOverlays(){["menu","lobby","results"].forEach(id=>$(id).classList.a
 function newSolo(rv){
   if(room)leaveRoom();
   mode="solo";rival=rv||rival;
-  setLanes(2,1);
   const rc=rival.color===myColor?COLORS.find(c=>c!==myColor&&c!=="#e9e9e9"):rival.color;
-  setupRace([{id:"ai",ai:true,name:rival.name,mph:rival.mph,color:rc,dark:shade(rc,0.62),p:0,speed:0,lane:0}],null);
+  const opps=[{id:"ai",ai:true,name:rival.name,mph:rival.mph,color:rc,dark:shade(rc,0.62),p:0,speed:0,lane:0}];
+  const g=ghostOn?loadGhost(rival.id):null;
+  if(g)opps.push({id:"ghost",ghost:true,name:"👻 Your best",samples:g.s,time:g.t,color:myColor,dark:shade(myColor,0.62),p:0,lane:2});
+  setLanes(g?3:2,1);
+  setupRace(opps,null);ghostRec=[];
   state="ready";setHint("Type the first word to launch",true);focusInput();
 }
 
@@ -305,7 +314,8 @@ document.addEventListener("keydown",e=>{
 function showMenu(msg){
   state="menu";mode="solo";input.blur();$("tap").classList.add("hide");
   $("opts").innerHTML=RIVALS.map(rv=>{const b=parseFloat(store("kr_best_"+rv.id)||"0");
-    return `<button class="opt" data-id="${rv.id}"><span>${rv.name}<small>${rv.desc}</small></span><span class="best">${b?"best "+fmt(b):""}</span></button>`}).join("");
+    return `<button class="opt" data-id="${rv.id}"><span>${rv.name}<small>${rv.desc}</small></span><span class="best">${b?"best "+fmt(b):""}${loadGhost(rv.id)&&ghostOn?" 👻":""}</span></button>`}).join("")+
+    `<button class="opt" id="ghostTg"><span>👻 Ghost car<small>Race a replay of your best run</small></span><span class="best">${ghostOn?"ON":"OFF"}</span></button>`;
   $("mErr").textContent=msg||"";$("mErr").style.color="";
   if(!sb){$("mErr").textContent="Multiplayer isn't available right now — solo still works.";$("createBtn").disabled=true;$("joinBtn").disabled=true}
   $("nameIn").value=myName;renderSwatches();
@@ -313,7 +323,8 @@ function showMenu(msg){
 }
 $("swatches").addEventListener("click",e=>{const b=e.target.closest("button[data-c]");if(!b)return;myColor=b.dataset.c;store("kr_color",myColor);renderSwatches();buildDots()});
 $("muteBtn").addEventListener("click",e=>{e.stopPropagation();audioInit();muted=!muted;store("kr_mute",muted?"1":"0");renderMute()});
-$("opts").addEventListener("click",e=>{const b=e.target.closest(".opt");if(b)newSolo(RIVALS.find(x=>x.id===b.dataset.id))});
+$("opts").addEventListener("click",e=>{if(e.target.closest("#ghostTg")){ghostOn=!ghostOn;store("kr_ghost_on",ghostOn?"1":"0");showMenu();return}
+  const b=e.target.closest(".opt");if(b)newSolo(RIVALS.find(x=>x.id===b.dataset.id))});
 function needName(){const n=$("nameIn").value.trim();if(!n){$("mErr").textContent="Type your name first so friends know who you are.";$("nameIn").focus();return null}return n.slice(0,14)}
 $("createBtn").addEventListener("click",()=>{const n=needName();if(n)enterRoom(makeCode(),true,n)});
 $("joinBtn").addEventListener("click",()=>{const n=needName();if(!n)return;const c=$("codeIn").value.trim().toUpperCase();
@@ -419,7 +430,10 @@ function finishMe(dnf){
   let msg="";
   if(!dnf){const k="kr_best_"+rival.id,prev=parseFloat(store(k)||"0");
     if(!prev||elapsed<prev){store(k,elapsed.toFixed(2));msg=prev?`🎉 New best vs ${rival.name}! (was ${fmt(prev)})`:"🎉 First time saved as your best"}
-    else msg=`Your best vs ${rival.name}: ${fmt(prev)}`}
+    else msg=`Your best vs ${rival.name}: ${fmt(prev)}`;
+    const gh=opponents.find(o=>o.ghost);
+    if(gh)msg+=`<br>${elapsed<gh.time?`👻 You beat your ghost by ${fmt(gh.time-elapsed)}`:`👻 Your ghost was ${fmt(elapsed-gh.time)} faster`}`;
+    if(!prev||elapsed<prev||!loadGhost(rival.id)){ghostRec.push(Math.round(TRACK));store("kr_ghost_"+rival.id,JSON.stringify({t:+elapsed.toFixed(2),s:ghostRec}))}}
   $("resCard").innerHTML=`<h2>${dnf?"⏱ Out of time":won?"🏆 You win!":`😤 ${rival.name} wins`}</h2>
     <div class="grid"><div><div class="l">Your time</div><div class="v">${dnf?"DNF":fmt(elapsed)}</div></div>
     <div><div class="l">Rival time</div><div class="v">${fmt(rT)}</div></div>
@@ -455,10 +469,12 @@ function update(dt){
     const take=pending*Math.min(1,dt*5);speed+=take;pending-=take;
     speed-=speed*0.25*dt;if(speed<0.3)speed=0;if(speed>220)speed=220;
     p+=speed*UPM*dt;
+    if(mode==="solo")while(elapsed>=ghostRec.length*GHOST_DT)ghostRec.push(Math.round(Math.min(p,TRACK)));
     if(mode==="multi"&&room&&now-lastSend>160){lastSend=now;send("pos",{id:myId,p:Math.round(p),speed:Math.round(speed*10)/10})}
     if(p>=TRACK)finishMe(false);else if(elapsed>180)finishMe(true);
   }else if(state==="done"){speed=Math.max(0,speed-speed*1.2*dt-4*dt);p+=speed*UPM*dt}
   for(const o of opponents){
+    if(o.ghost){o.p=state==="ready"?0:ghostAt(o,elapsed);continue}
     if(o.ai){
       if(state==="racing"){const target=o.mph*(1+0.07*Math.sin(elapsed*0.6));o.speed+=(target-o.speed)*Math.min(1,dt*0.7)}
       else if(state==="done")o.speed=Math.max(0,o.speed-o.speed*1.2*dt);
@@ -472,12 +488,14 @@ function update(dt){
   skyOff+=curveAt(Math.floor(p/SEG))*speed*dt*0.12;
   shake*=Math.pow(0.02,dt);
 }
-function oppP(o){return o.ai?o.p:o.dispP}
-function buildDots(){$("prog").innerHTML=opponents.map((o,i)=>`<div class="dot" data-i="${i}" style="background:${o.color}"></div>`).join("")+`<div class="dot you" style="background:${myColor};border-color:#fff"></div><span class="flag">🏁</span>`}
+function oppP(o){return o.ai||o.ghost?o.p:o.dispP}
+function buildDots(){$("prog").innerHTML=opponents.map((o,i)=>`<div class="dot" data-i="${i}" style="background:${o.color}${o.ghost?";opacity:.45":""}"></div>`).join("")+`<div class="dot you" style="background:${myColor};border-color:#fff"></div><span class="flag">🏁</span>`}
 function updateHud(){
   $("mph").textContent=Math.round(speed);$("clock").textContent=fmt(elapsed);
-  const total=opponents.length+1,rank=1+opponents.filter(o=>oppP(o)>p).length;
+  const real=opponents.filter(o=>!o.ghost),total=real.length+1,rank=1+real.filter(o=>oppP(o)>p).length;
   $("posN").textContent=ord(rank);
+  const gh=mode==="solo"&&opponents.find(o=>o.ghost);
+  if(gh&&state==="racing"){const d=Math.round((p-gh.p)/UNITS_PER_M);setHint(d>=0?`👻 ${d}m ahead of your best`:`👻 ${-d}m behind your best`,d>=0)}
   if(mode==="solo"&&opponents[0]){const o=opponents[0],gap=Math.abs(p-o.p)/UNITS_PER_M;$("gap").textContent=state==="racing"&&gap>1?(p>=o.p?"+":"−")+Math.round(gap)+"m":""}
   else $("gap").textContent="of "+total;
   const dots=$("prog").children;
@@ -553,7 +571,8 @@ function render(){
   for(const o of opponents){const op=oppP(o),rel=op-camZ;
     if(rel>60&&rel<DRAW*SEG*0.98){const fn=(op-base*SEG)/SEG,n=Math.floor(fn),t=fn-n;
       if(n>=0&&n<DRAW){const xw=pts[n].xw+(pts[n+1].xw-pts[n].xw)*t,sc=CAMD/rel,lx=laneX(o.lane);
-        spr.push({z:rel,draw:()=>car(W/2+sc*(xw+lx-camX)*k,hy+sc*CAMH*vs,sc*CARW*k*fac,o.color,o.dark,false,mode==="multi"?o.name:"")})}}}
+        spr.push({z:rel,draw:()=>{if(o.ghost)ctx.globalAlpha=0.42;
+          car(W/2+sc*(xw+lx-camX)*k,hy+sc*CAMH*vs,sc*CARW*k*fac,o.color,o.dark,false,mode==="multi"||o.ghost?o.name:"");ctx.globalAlpha=1}})}}}
   spr.sort((a,b)=>b.z-a.z).forEach(s=>s.draw());
   if(speed>85||performance.now()<turboUntil){ctx.strokeStyle=`rgba(255,255,255,${Math.min(.5,(speed-85)/200)})`;ctx.lineWidth=2;
     for(let i=0;i<14;i++){const x0=i%2?Math.random()*W*0.22:W-Math.random()*W*0.22,y0=hy+Math.random()*vs;
