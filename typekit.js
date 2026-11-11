@@ -80,10 +80,21 @@ function renderTyped(el,typer){
   el.innerHTML=t&&t.alive?`<span class="ok">${t.word.slice(0,t.typed)}</span><span class="rest">${t.word.slice(t.typed)}</span>`:'<span class="ph">Type any word you see · space to switch targets</span>';
 }
 
+// Typing stats. WPM counts only time you're actually typing (gaps over 1.5s, like waiting
+// for the next target, aren't counted, nor is time with nothing on screen), so it reflects your real speed, not the game's pace.
+function makeStats(){
+  return{hits:0,misses:0,active:0,last:0,gaps:0,
+    tick(){const n=performance.now();if(this.last&&n-this.last<1500){this.active+=(n-this.last)/1000;this.gaps++}this.last=n},
+    hit(){this.tick();this.hits++},miss(){this.tick();this.misses++},
+    pause(){this.last=0}, // call while there's nothing on screen to type
+    wpm(){return this.active>=3?Math.round(this.gaps*(this.hits/(this.hits+this.misses))/5/(this.active/60)):0}, // keys per timed gap, counting only correct keys
+    acc(){const t=this.hits+this.misses;return t?Math.round(this.hits/t*100):100}};
+}
+
 function setupMute(btn){
   const r=()=>{btn.textContent=muted?"🔇":"🔊"};r();
   btn.addEventListener("click",e=>{e.stopPropagation();init();muted=!muted;store("tk_mute",muted?"1":"0");r()});
 }
 
-window.TK={store,pickWord,ALL,init,tone,noise,buzz,fitViewport,setupInput,makeTyper,renderTyped,setupMute};
+window.TK={store,pickWord,ALL,init,tone,noise,buzz,fitViewport,setupInput,makeTyper,renderTyped,setupMute,makeStats};
 })();

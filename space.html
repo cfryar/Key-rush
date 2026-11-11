@@ -21,7 +21,7 @@
       <button class="pill" id="mute" aria-label="Sound on or off"></button>
     </div>
   </div>
-  <div class="typedbar" id="typedbar"><span id="typed"></span>
+  <div class="typedbar" id="typedbar"><span id="typed"></span><span class="tstat" id="tstat"><b>0</b> wpm<br><b>100%</b></span>
     <input id="tkIn" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
     <div id="tkTap" class="tap hide">👆 Tap here to type</div>
   </div>
@@ -49,15 +49,15 @@ const cv=$("cv"),ctx=cv.getContext("2d");let W=0,H=0;
 function resize(){const r=cv.getBoundingClientRect(),d=Math.min(2,window.devicePixelRatio||1);W=r.width;H=r.height;cv.width=W*d;cv.height=H*d;ctx.setTransform(d,0,0,d,0,0)}
 TK.fitViewport(resize);TK.setupMute($("mute"));
 
-let state="menu",score=0,wave=1,lives=3,combo=0,enemies=[],bolts=[],parts=[],toSpawn=0,spawnT=0,banner=0,shake=0,shipAng=-Math.PI/2,hits=0,misses=0,kills=0;
-const typer=TK.makeTyper();
+let state="menu",score=0,wave=1,lives=3,combo=0,enemies=[],bolts=[],parts=[],toSpawn=0,spawnT=0,banner=0,shake=0,shipAng=-Math.PI/2,kills=0;
+const typer=TK.makeTyper();let st=TK.makeStats();
 const inp=TK.setupInput({onChar,onRelease:()=>{typer.release();TK.renderTyped($("typed"),typer)},active:()=>state==="play"});
 const stars=[...Array(140)].map(()=>({x:Math.random(),y:Math.random(),z:Math.random()}));
 const ship=()=>({x:W/2,y:H-44});
 function mult(){return 1+Math.min(3,Math.floor(combo/15))}
 
 function start(){
-  TK.init();score=0;lives=3;combo=0;enemies=[];bolts=[];parts=[];hits=0;misses=0;kills=0;typer.target=null;
+  TK.init();score=0;lives=3;combo=0;enemies=[];bolts=[];parts=[];st=TK.makeStats();kills=0;typer.target=null;
   state="play";startWave(1);$("menu").classList.add("hide");$("over").classList.add("hide");TK.renderTyped($("typed"),typer);inp.focus();
 }
 function startWave(n){wave=n;toSpawn=5+n*2;spawnT=0.4;banner=2;if(n>1){TK.tone(523,0.15,"triangle",0.12);TK.tone(784,0.25,"triangle",0.12,0,0.12)}}
@@ -73,9 +73,9 @@ function explode(x,y,col,n){for(let i=0;i<n;i++){const a=Math.random()*7,s=40+Ma
 function onChar(ch){
   if(state!=="play")return;
   const r=typer.key(ch,enemies,e=>e.y);
-  if(r.miss){combo=0;misses++;TK.tone(150,0.09,"square",0.05)}
+  if(r.miss){combo=0;st.miss();TK.tone(150,0.09,"square",0.05)}
   else{
-    hits++;combo++;const t=r.t,s=ship();
+    st.hit();combo++;const t=r.t,s=ship();
     bolts.push({x1:s.x,y1:s.y-16,x2:t.x,y2:t.y,life:0.09});t.flash=0.07;t.knock=0.12;
     shipAng=Math.atan2(t.y-s.y,t.x-s.x);TK.tone(1500,0.07,"square",0.035,500);
     if(r.done){t.alive=false;kills++;score+=t.word.length*10*mult();explode(t.x,t.y,"#f2b84b",22);explode(t.x,t.y,"#8a8199",10);TK.noise(0.45,1500,90,0.35)}
@@ -91,8 +91,7 @@ function gameOver(){
   state="over";inp.blur();const best=+(TK.store("tk_best_space")||0),nb=score>best;if(nb)TK.store("tk_best_space",String(score));
   TK.tone(400,0.3,"sawtooth",0.08,120);
   $("oScore").textContent=score;
-  const acc=hits+misses?Math.round(hits/(hits+misses)*100):0;
-  $("oStats").innerHTML=`Wave ${wave} · ${kills} asteroids · ${acc}% accuracy<br>${nb?"🎉 New best score!":`Best: ${Math.max(best,score)}`}`;
+    $("oStats").innerHTML=`Wave ${wave} · ${kills} asteroids<br><b>${st.wpm()} WPM</b> · <b>${st.acc()}% accuracy</b><br>${nb?"🎉 New best score!":`Best: ${Math.max(best,score)}`}`;
   setTimeout(()=>$("over").classList.remove("hide"),600);
 }
 
@@ -106,7 +105,7 @@ function update(dt){
       const dx=s.x-e.x,dy=s.y-e.y,d=Math.hypot(dx,dy)||1,v=e.speed*(e.knock>0?0.15:1);
       e.x+=dx/d*v*dt;e.y+=dy/d*v*dt;e.rot+=e.spin*dt;e.knock-=dt;e.flash-=dt;
       if(d<e.r+16){e.alive=false;hurt(e);if(state!=="play")break}}
-    enemies=enemies.filter(e=>e.alive);
+    enemies=enemies.filter(e=>e.alive);if(!enemies.length)st.pause();
     if(state==="play"&&toSpawn===0&&banner<=0&&!enemies.length){score+=100*wave;startWave(wave+1)}
   }
   bolts.forEach(b=>b.life-=dt);bolts=bolts.filter(b=>b.life>0);
@@ -145,7 +144,7 @@ function render(){
     ctx.fillText(`WAVE ${wave}`,W/2,H*0.4);ctx.globalAlpha=1}
   ctx.restore();
 }
-function hud(){$("score").textContent=score;$("mult").textContent="x"+mult();$("wave").textContent="Wave "+wave;$("lives").textContent="❤️".repeat(Math.max(0,lives))||"💀"}
+function hud(){$("tstat").innerHTML=`<b>${st.wpm()}</b> wpm<br><b>${st.acc()}%</b>`;$("score").textContent=score;$("mult").textContent="x"+mult();$("wave").textContent="Wave "+wave;$("lives").textContent="❤️".repeat(Math.max(0,lives))||"💀"}
 
 $("playBtn").addEventListener("click",start);$("againBtn").addEventListener("click",start);
 document.addEventListener("keydown",e=>{if(e.key==="Enter"&&state!=="play"){e.preventDefault();start()}});

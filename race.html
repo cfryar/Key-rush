@@ -121,7 +121,7 @@
   </div>
   <div class="typebox" id="typebox">
     <div class="wordsline" id="wordsline"></div>
-    <div class="sub"><span id="hint" class="hint"></span><span>Streak <b id="streak">0</b> · WPM <b id="wpm">0</b></span></div>
+    <div class="sub"><span id="hint" class="hint"></span><span>Streak <b id="streak">0</b> · WPM <b id="wpm">0</b> · Acc <b id="acc">–</b></span></div>
     <input id="hidden" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
     <div class="tap hide" id="tap">👆 Tap here to type</div>
   </div>
@@ -269,10 +269,11 @@ function newSolo(rv){
 input.addEventListener("input",()=>{
   if(state==="ready"){if(!input.value.trim()){input.value="";return}state="racing";setHint(`Racing the ${rival.name}`)}
   if(state!=="racing"){input.value="";return}
-  const v=input.value,w=words[idx];
-  if(v.length>cur.length){for(let k=cur.length;k<v.length;k++){const ch=v[k];if(ch===" ")continue;keys++;if(ch===w[k])good++}}
-  if(v.includes(" ")){const parts=v.split(" "),t=parts[0],rest=parts.slice(1).join("");if(t)commit(t);input.value=rest;cur=rest}
-  else cur=v.slice(0,w.length+8);
+  // Accuracy: every letter you type counts once, checked against the word it was typed into.
+  const v=input.value,count=(prev,now,w)=>{for(let k=prev.length;k<now.length;k++){keys++;if(now[k]===w[k])good++}};
+  if(v.includes(" ")){const parts=v.split(" "),t=parts[0],rest=parts.slice(1).join("");
+    count(cur,t,words[idx]);if(t)commit(t);count("",rest,words[idx]);input.value=rest;cur=rest}
+  else{count(cur,v,words[idx]);cur=v.slice(0,words[idx].length+8)}
   renderWords();
 });
 function commit(t){
@@ -453,7 +454,7 @@ function renderMultiResults(){
   const title=!mine?"":mine.dnf?"⏱ Out of time":place===1?"🏆 You win!":`You finished ${ord(place)}`;
   const host=isHost();
   $("resCard").innerHTML=`<h2>${title}</h2>
-    <div class="rows">${rows.map((x,i)=>`<div class="rrow ${x.id===myId?"me":""}"><span class="pl">${i+1}</span><b>${esc(x.name)}</b><span class="t">${x.r?(x.r.dnf?"DNF":fmt(x.r.time)+" · "+x.r.wpm+" wpm"):x.gone?"left":"racing…"}</span></div>`).join("")}</div>
+    <div class="rows">${rows.map((x,i)=>`<div class="rrow ${x.id===myId?"me":""}"><span class="pl">${i+1}</span><b>${esc(x.name)}</b><span class="t">${x.r?(x.r.dnf?"DNF":fmt(x.r.time)+" · "+x.r.wpm+" wpm · "+x.r.acc+"%"):x.gone?"left":"racing…"}</span></div>`).join("")}</div>
     <div class="row">${host?`<button class="btn" data-act="newrace">New race</button>`:`<button class="btn" disabled>Waiting for host…</button>`}<button class="btn alt" data-act="leave">Leave</button></div>`;
 }
 $("results").addEventListener("click",e=>{const b=e.target.closest("[data-act]");if(!b)return;const a=b.dataset.act;
@@ -506,7 +507,7 @@ function updateHud(){
   $("nitro").textContent=turbo?"⚡ TURBO":"🔥 NITRO";$("nitro").classList.toggle("on",turbo||nitro);
   if(nitro&&!wasNitro)sfx.whoosh();wasNitro=nitro;
   $("shieldB").classList.toggle("hide",!(shield&&activeState()));
-  $("streak").textContent=streak;$("wpm").textContent=elapsed>1?Math.round(correctChars/5/(elapsed/60)):0;
+  $("streak").textContent=streak;$("wpm").textContent=elapsed>1?Math.round(correctChars/5/(elapsed/60)):0;$("acc").textContent=keys?Math.round(good/keys*100)+"%":"–";
   $("tap").classList.toggle("hide",!(activeState()&&document.activeElement!==input));
   const c=$("count"),now=performance.now();
   if(state==="countdown"){const n=Math.max(1,Math.ceil((countdownEnd-now)/1000));if(n!==lastBeep){lastBeep=n;sfx.beep()}c.classList.remove("hide");c.textContent=n}

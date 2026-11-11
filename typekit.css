@@ -11,6 +11,8 @@ a.pill,button.pill{pointer-events:auto;cursor:pointer}
 .mult{color:var(--accent)}
 .typedbar{height:52px;flex:0 0 52px;background:var(--panel);border-top:1px solid var(--line);display:flex;align-items:center;justify-content:center;font:700 24px 'JetBrains Mono',monospace;letter-spacing:.08em;position:relative;cursor:text}
 .typedbar .ok{color:var(--accent)}.typedbar .rest{color:#6d7380}.typedbar .ph{color:var(--dim);font:600 14px Inter,sans-serif;letter-spacing:0}
+.tstat{position:absolute;right:12px;top:50%;transform:translateY(-50%);font:700 12px 'JetBrains Mono',monospace;color:var(--dim);letter-spacing:0;text-align:right;line-height:1.35}
+.tstat b{color:var(--text)}
 .tap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(23,26,34,.92);color:var(--accent);font:800 16px Inter,sans-serif;letter-spacing:0}
 #tkIn{position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;border:0;padding:0;font-size:16px}
 .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(8,9,13,.66);backdrop-filter:blur(3px);z-index:10;overflow:auto}

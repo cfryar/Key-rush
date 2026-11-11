@@ -21,7 +21,7 @@
       <button class="pill" id="mute" aria-label="Sound on or off"></button>
     </div>
   </div>
-  <div class="typedbar" id="typedbar"><span id="typed"></span>
+  <div class="typedbar" id="typedbar"><span id="typed"></span><span class="tstat" id="tstat"><b>0</b> wpm<br><b>100%</b></span>
     <input id="tkIn" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
     <div id="tkTap" class="tap hide">👆 Tap here to type</div>
   </div>
@@ -50,15 +50,15 @@ function resize(){const r=cv.getBoundingClientRect(),d=Math.min(2,window.deviceP
 TK.fitViewport(resize);TK.setupMute($("mute"));
 
 const SHIRTS=["#6b5b95","#88664d","#4a6670","#7a4a4a","#5b6b3a","#3f4a73"];
-let state="menu",score=0,wave=1,hp=100,combo=0,zs=[],shots=[],parts=[],toSpawn=0,spawnT=0,banner=0,shake=0,hits=0,misses=0,kills=0,thumpT=0,bossLeft=0,t=0;
-const typer=TK.makeTyper();
+let state="menu",score=0,wave=1,hp=100,combo=0,zs=[],shots=[],parts=[],toSpawn=0,spawnT=0,banner=0,shake=0,kills=0,thumpT=0,bossLeft=0,t=0;
+const typer=TK.makeTyper();let st=TK.makeStats();
 const inp=TK.setupInput({onChar,onRelease:()=>{typer.release();TK.renderTyped($("typed"),typer)},active:()=>state==="play"});
 const horizon=()=>H*0.34,barX=()=>Math.max(64,Math.min(110,W*0.17)),gun=()=>({x:barX()-26,y:H*0.66-34});
 function mult(){return 1+Math.min(3,Math.floor(combo/15))}
 const hills=[...Array(18)].map((_,i)=>({x:i/17,h:0.3+Math.random()*0.7}));
 
 function start(){
-  TK.init();score=0;hp=100;combo=0;zs=[];shots=[];parts=[];hits=0;misses=0;kills=0;typer.target=null;
+  TK.init();score=0;hp=100;combo=0;zs=[];shots=[];parts=[];st=TK.makeStats();kills=0;typer.target=null;
   state="play";startWave(1);$("menu").classList.add("hide");$("over").classList.add("hide");TK.renderTyped($("typed"),typer);inp.focus();
 }
 function startWave(n){
@@ -80,9 +80,9 @@ function head(z){return{x:z.x,y:z.y-62*z.s}}
 function onChar(ch){
   if(state!=="play")return;
   const r=typer.key(ch,zs.filter(z=>z.alive&&!z.dying),z=>-z.x);
-  if(r.miss){combo=0;misses++;TK.tone(140,0.09,"square",0.05)}
+  if(r.miss){combo=0;st.miss();TK.tone(140,0.09,"square",0.05)}
   else{
-    hits++;combo++;const z=r.t,h=head(z),gp=gun();
+    st.hit();combo++;const z=r.t,h=head(z),gp=gun();
     shots.push({x1:gp.x+22,y1:gp.y,x2:h.x,y2:h.y+8*z.s,life:0.07});z.flash=0.07;z.knock=0.15;
     TK.noise(0.08,3000,900,0.18);
     if(r.done){z.dying=0.7;kills++;score+=z.word.length*10*mult()*(z.boss?3:1);burst(h.x,h.y,"#8fd16a",z.boss?40:18);
@@ -94,8 +94,7 @@ function gameOver(){
   state="over";inp.blur();const best=+(TK.store("tk_best_zombie")||0),nb=score>best;if(nb)TK.store("tk_best_zombie",String(score));
   TK.tone(220,0.6,"sawtooth",0.09,70);
   $("oScore").textContent=score;
-  const acc=hits+misses?Math.round(hits/(hits+misses)*100):0;
-  $("oStats").innerHTML=`Wave ${wave} · ${kills} zombies · ${acc}% accuracy<br>${nb?"🎉 New best score!":`Best: ${Math.max(best,score)}`}`;
+    $("oStats").innerHTML=`Wave ${wave} · ${kills} zombies<br><b>${st.wpm()} WPM</b> · <b>${st.acc()}% accuracy</b><br>${nb?"🎉 New best score!":`Best: ${Math.max(best,score)}`}`;
   setTimeout(()=>$("over").classList.remove("hide"),700);
 }
 
@@ -118,7 +117,7 @@ function update(dt){
     }
     if(attackers){hp-=attackers*5*dt;thumpT-=dt;if(thumpT<=0){thumpT=0.8;shake=6;TK.noise(0.2,250,60,0.4,"lowpass");TK.buzz(40)}}
     if(hp<=0){hp=0;gameOver()}
-    zs=zs.filter(z=>z.alive);
+    zs=zs.filter(z=>z.alive);if(!zs.some(z=>!z.dying))st.pause();
     if(state==="play"&&toSpawn===0&&bossLeft===0&&banner<=0&&!zs.length){score+=100*wave;startWave(wave+1)}
   }
   shots.forEach(s=>s.life-=dt);shots=shots.filter(s=>s.life>0);
@@ -177,7 +176,7 @@ function render(){
     ctx.fillText(wave%5===0?`WAVE ${wave} · BOSS`:`WAVE ${wave}`,W/2,hz+(H-hz)*0.35);ctx.globalAlpha=1}
   ctx.restore();
 }
-function hud(){$("score").textContent=score;$("mult").textContent="x"+mult();$("wave").textContent="Wave "+wave}
+function hud(){$("tstat").innerHTML=`<b>${st.wpm()}</b> wpm<br><b>${st.acc()}%</b>`;$("score").textContent=score;$("mult").textContent="x"+mult();$("wave").textContent="Wave "+wave}
 
 $("playBtn").addEventListener("click",start);$("againBtn").addEventListener("click",start);
 document.addEventListener("keydown",e=>{if(e.key==="Enter"&&state!=="play"){e.preventDefault();start()}});
