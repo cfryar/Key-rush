@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verse Sprint · Key Rush</title>
+<meta name="description" content="Type today's Bible verse as fast and accurately as you can.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800;900&family=Lora:ital,wght@0,500;1,500&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#0e1016;--panel:#171a22;--card:#1f232d;--line:#262a35;--text:#ece9e4;--dim:#7a8190;--accent:#f2b84b;--bad:#ff5c6a;--good:#5fd48a}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif;min-height:100vh}
+  main{max-width:760px;margin:0 auto;padding:18px 16px 40px}
+  .top{display:flex;align-items:center;gap:10px;justify-content:space-between}
+  .top a{color:var(--dim);text-decoration:none;font-weight:700;font-size:14px}
+  h1{margin:14px 0 2px;font:900 34px Inter,sans-serif;letter-spacing:-.03em}
+  h1 span{color:var(--accent)}
+  .sub{color:#a8a39b;margin:0 0 16px}
+  .seg{display:inline-flex;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:3px}
+  .seg button{background:none;border:0;color:var(--dim);font:700 13px Inter,sans-serif;padding:6px 10px;border-radius:7px;cursor:pointer}
+  .seg button.on{background:#2a2f3b;color:var(--accent)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:18px;position:relative;cursor:text}
+  .ref{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}
+  .ref b{font:800 15px Inter,sans-serif;color:var(--accent)}
+  .ref small{color:var(--dim);font-weight:700}
+  .text{font:400 21px/1.75 'JetBrains Mono',monospace;word-break:normal;overflow-wrap:break-word;user-select:none}
+  .text .c{color:#5d6472}.text .ok{color:var(--text)}.text .no{color:var(--bad);background:rgba(255,92,106,.15);border-radius:3px}
+  .text .cur{box-shadow:-2px 0 0 var(--accent);animation:blink 1s step-end infinite}
+  @keyframes blink{50%{box-shadow:none}}
+  .live{display:flex;gap:18px;margin-top:14px;font:700 14px 'JetBrains Mono',monospace;color:var(--dim)}
+  .live b{color:var(--text)}
+  #inp{position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;border:0;padding:0;font-size:16px;resize:none}
+  .tap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(23,26,34,.9);border-radius:18px;color:var(--accent);font-weight:800}
+  .done{margin-top:16px;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:18px;text-align:center}
+  .done h2{margin:0;font:900 26px Inter,sans-serif}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}
+  .grid div{background:var(--card);border-radius:12px;padding:10px}
+  .l{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);font-weight:800}
+  .v{font:700 24px 'JetBrains Mono',monospace;color:var(--accent);margin-top:2px}
+  .quote{font:italic 500 17px/1.5 Lora,Georgia,serif;color:#d9d4cb;margin:6px 0 4px}
+  .msg{color:var(--accent);font-weight:700;min-height:20px}
+  .row{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+  .btn{flex:1;min-width:120px;background:var(--accent);color:#14161b;border:0;border-radius:12px;padding:12px;font:800 15px Inter,sans-serif;cursor:pointer;text-decoration:none;text-align:center}
+  .btn.alt{background:var(--card);color:var(--text);border:1px solid var(--line)}
+  .foot{color:var(--dim);font-size:13px;margin-top:22px;line-height:1.5}
+  .hide{display:none!important}
+  @media (max-width:520px){.text{font-size:18px}h1{font-size:28px}}
+</style>
+</head>
+<body>
+<main>
+  <div class="top"><a href="./">← All games</a>
+    <div class="seg" id="modeSeg"><button data-m="simple">Simple</button><button data-m="exact">Exact</button></div></div>
+  <h1>Verse <span>Sprint</span></h1>
+  <p class="sub" id="sub">Type today's verse as fast as you can. Your clock starts on your first letter.</p>
+
+  <div class="card" id="card">
+    <div class="ref"><b id="ref"></b><small id="streak"></small></div>
+    <div class="text" id="text"></div>
+    <div class="live"><span>⏱ <b id="time">0.0s</b></span><span>WPM <b id="wpm">0</b></span><span>Acc <b id="acc">100%</b></span></div>
+    <textarea id="inp" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
+    <div class="tap hide" id="tap">👆 Tap to start typing</div>
+  </div>
+
+  <div class="done hide" id="done">
+    <h2 id="dTitle">Done!</h2>
+    <div class="grid"><div><div class="l">Time</div><div class="v" id="dTime">0</div></div><div><div class="l">WPM</div><div class="v" id="dWpm">0</div></div><div><div class="l">Accuracy</div><div class="v" id="dAcc">0</div></div></div>
+    <p class="quote" id="dQuote"></p>
+    <div class="msg" id="dMsg"></div>
+    <div class="row"><button class="btn" id="againBtn">Try again</button><button class="btn alt" id="copyBtn">Copy my result</button></div>
+    <div class="row"><button class="btn alt" id="todayBtn">Today's verse</button><button class="btn alt" id="randBtn">Another verse</button></div>
+  </div>
+
+  <p class="foot">Simple mode skips capitals and punctuation, which is easier on a phone. Exact mode is the verse word for word. Verses are from the King James Version (public domain). Your best times are saved on this device.</p>
+</main>
+<script>
+const V=[
+["John 3:16","For God so loved the world, that he gave his only begotten Son, that whosoever believeth in him should not perish, but have everlasting life."],
+["Psalm 23:1","The LORD is my shepherd; I shall not want."],
+["Philippians 4:13","I can do all things through Christ which strengtheneth me."],
+["Proverbs 3:5-6","Trust in the LORD with all thine heart; and lean not unto thine own understanding. In all thy ways acknowledge him, and he shall direct thy paths."],
+["Jeremiah 29:11","For I know the thoughts that I think toward you, saith the LORD, thoughts of peace, and not of evil, to give you an expected end."],
+["Romans 8:28","And we know that all things work together for good to them that love God, to them who are the called according to his purpose."],
+["Isaiah 40:31","But they that wait upon the LORD shall renew their strength; they shall mount up with wings as eagles; they shall run, and not be weary; and they shall walk, and not faint."],
+["Joshua 1:9","Have not I commanded thee? Be strong and of a good courage; be not afraid, neither be thou dismayed: for the LORD thy God is with thee whithersoever thou goest."],
+["Matthew 6:33","But seek ye first the kingdom of God, and his righteousness; and all these things shall be added unto you."],
+["Psalm 46:10","Be still, and know that I am God: I will be exalted among the heathen, I will be exalted in the earth."],
+["1 Peter 4:10","As every man hath received the gift, even so minister the same one to another, as good stewards of the manifold grace of God."],
+["Genesis 1:1","In the beginning God created the heaven and the earth."],
+["Psalm 119:105","Thy word is a lamp unto my feet, and a light unto my path."],
+["Romans 12:2","And be not conformed to this world: but be ye transformed by the renewing of your mind, that ye may prove what is that good, and acceptable, and perfect, will of God."],
+["2 Timothy 1:7","For God hath not given us the spirit of fear; but of power, and of love, and of a sound mind."],
+["Matthew 11:28","Come unto me, all ye that labour and are heavy laden, and I will give you rest."],
+["Hebrews 11:1","Now faith is the substance of things hoped for, the evidence of things not seen."],
+["Psalm 118:24","This is the day which the LORD hath made; we will rejoice and be glad in it."],
+["1 John 4:19","We love him, because he first loved us."],
+["Micah 6:8","He hath shewed thee, O man, what is good; and what doth the LORD require of thee, but to do justly, and to love mercy, and to walk humbly with thy God?"],
+["Psalm 37:4","Delight thyself also in the LORD; and he shall give thee the desires of thine heart."],
+["Proverbs 16:3","Commit thy works unto the LORD, and thy thoughts shall be established."],
+["Matthew 5:14","Ye are the light of the world. A city that is set on an hill cannot be hid."],
+["John 14:6","Jesus saith unto him, I am the way, the truth, and the life: no man cometh unto the Father, but by me."],
+["Romans 6:23","For the wages of sin is death; but the gift of God is eternal life through Jesus Christ our Lord."],
+["Psalm 139:14","I will praise thee; for I am fearfully and wonderfully made: marvellous are thy works; and that my soul knoweth right well."],
+["Lamentations 3:22-23","It is of the LORD's mercies that we are not consumed, because his compassions fail not. They are new every morning: great is thy faithfulness."],
+["Galatians 6:9","And let us not be weary in well doing: for in due season we shall reap, if we faint not."],
+["Psalm 34:8","O taste and see that the LORD is good: blessed is the man that trusteth in him."],
+["John 1:1","In the beginning was the Word, and the Word was with God, and the Word was God."],
+["Psalm 121:1-2","I will lift up mine eyes unto the hills, from whence cometh my help. My help cometh from the LORD, which made heaven and earth."]];
+const $=id=>document.getElementById(id);
+function store(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){return null}}
+function dayNum(d){d=d||new Date();return Math.floor((d.getTime()-d.getTimezoneOffset()*60000)/86400000)}
+const TODAY=dayNum(),todayIdx=((TODAY%V.length)+V.length)%V.length;
+let mode=store("vs_mode")==="exact"?"exact":"simple",vi=todayIdx,isToday=true,target="",typed="",t0=0,endT=0,keys=0,good=0,finished=false,timer=null;
+
+function simplify(s){return s.toLowerCase().replace(/[^a-z\s]/g,"").replace(/\s+/g," ").trim()}
+function load(i,today){
+  vi=i;isToday=!!today;const [ref,txt]=V[i];target=mode==="exact"?txt:simplify(txt);
+  typed="";t0=0;endT=0;keys=0;good=0;finished=false;$("inp").value="";clearInterval(timer);
+  $("ref").textContent=(isToday?"Today · ":"")+ref+" KJV";
+  const best=parseFloat(store(`vs_best_${mode}_${i}`)||"0");
+  const sk=+(store("vs_streak")||0),last=+(store("vs_last")||0),alive=last>=TODAY-1;
+  $("streak").textContent=alive&&sk?`🔥 ${sk}-day streak`:best?`Best ${best.toFixed(1)}s`:"";
+  $("done").classList.add("hide");$("card").classList.remove("hide");
+  $("sub").textContent=isToday?"Type today's verse as fast as you can. Your clock starts on your first letter.":"Practice verse. Your clock starts on your first letter.";
+  render();live();focusIn();
+}
+function render(){
+  let h="";const n=target.length;
+  for(let i=0;i<n;i++){const ch=target[i],t=typed[i],cls=t===undefined?"c":t===ch?"ok":"no",cur=i===typed.length?" cur":"";
+    const shown=ch===" "&&cls==="no"?"·":ch;h+=`<span class="${cls}${cur}">${shown.replace(/&/g,"&amp;").replace(/</g,"&lt;")}</span>`}
+  $("text").innerHTML=h;
+}
+function elapsed(){return t0?((endT||performance.now())-t0)/1000:0}
+function correctCount(){let c=0;for(let i=0;i<typed.length;i++)if(typed[i]===target[i])c++;return c}
+function live(){const e=elapsed();$("time").textContent=e.toFixed(1)+"s";$("wpm").textContent=e>1?Math.round(correctCount()/5/(e/60)):0;$("acc").textContent=(keys?Math.round(good/keys*100):100)+"%"}
+
+$("inp").addEventListener("input",()=>{
+  if(finished){$("inp").value=typed;return}
+  let v=$("inp").value.replace(/\n/g,"");
+  // phones sometimes swap in curly quotes or double spaces
+  v=v.replace(/[‘’]/g,"'").replace(/[“”]/g,'"');
+  if(mode==="simple")v=v.toLowerCase();
+  if(v.length>target.length)v=v.slice(0,target.length);
+  if(!t0&&v.length){t0=performance.now();timer=setInterval(live,100)}
+  for(let i=typed.length;i<v.length;i++){keys++;if(v[i]===target[i])good++}
+  typed=v;$("inp").value=v;render();live();
+  if(typed===target)finish();
+});
+function finish(){
+  finished=true;endT=performance.now();clearInterval(timer);live();$("inp").blur();
+  const e=elapsed(),wpm=Math.round(target.length/5/(e/60)),acc=Math.round(good/keys*100);
+  const key=`vs_best_${mode}_${vi}`,prev=parseFloat(store(key)||"0"),nb=!prev||e<prev;if(nb)store(key,e.toFixed(2));
+  let msg=nb?(prev?`🎉 New best! (was ${prev.toFixed(1)}s)`:"🎉 First time, saved as your best"):`Your best: ${prev.toFixed(1)}s`;
+  if(isToday){const last=+(store("vs_last")||0);let sk=+(store("vs_streak")||0);
+    if(last!==TODAY){sk=last===TODAY-1?sk+1:1;store("vs_streak",String(sk));store("vs_last",String(TODAY))}
+    msg+=` · 🔥 ${+(store("vs_streak")||1)}-day streak`}
+  $("dTitle").textContent=acc>=98?"Flawless!":acc>=90?"Well done!":"Done!";
+  $("dTime").textContent=e.toFixed(1)+"s";$("dWpm").textContent=wpm;$("dAcc").textContent=acc+"%";
+  $("dQuote").textContent=`"${V[vi][1]}" (${V[vi][0]})`;$("dMsg").textContent=msg;
+  $("done").classList.remove("hide");$("tap").classList.add("hide");
+  $("done").scrollIntoView({behavior:"smooth",block:"nearest"});
+  lastResult=`I typed ${V[vi][0]} in ${e.toFixed(1)}s (${wpm} WPM, ${acc}% accuracy) on Verse Sprint ${location.origin}${location.pathname}`;
+}
+let lastResult="";
+function focusIn(){$("inp").focus({preventScroll:true})}
+$("card").addEventListener("click",focusIn);
+$("tap").addEventListener("touchend",e=>{e.preventDefault();focusIn()});
+setInterval(()=>{$("tap").classList.toggle("hide",finished||document.activeElement===$("inp"))},150);
+$("againBtn").addEventListener("click",()=>load(vi,isToday));
+$("todayBtn").addEventListener("click",()=>load(todayIdx,true));
+$("randBtn").addEventListener("click",()=>{let i;do{i=Math.floor(Math.random()*V.length)}while(i===vi&&V.length>1);load(i,i===todayIdx)});
+$("copyBtn").addEventListener("click",async()=>{try{await navigator.clipboard.writeText(lastResult);$("copyBtn").textContent="Copied!"}catch(e){$("copyBtn").textContent="Couldn't copy"}setTimeout(()=>$("copyBtn").textContent="Copy my result",1800)});
+function setMode(m){mode=m;store("vs_mode",m);document.querySelectorAll("#modeSeg button").forEach(b=>b.classList.toggle("on",b.dataset.m===m));load(vi,isToday)}
+$("modeSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(b)setMode(b.dataset.m)});
+document.addEventListener("keydown",e=>{if(finished&&e.key==="Enter"){e.preventDefault();load(vi,isToday)}else if(!finished&&document.activeElement!==$("inp")&&e.key.length===1)focusIn()});
+document.querySelectorAll("#modeSeg button").forEach(b=>b.classList.toggle("on",b.dataset.m===mode));
+load(todayIdx,true);
+</script>
+</body>
+</html>

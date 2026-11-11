@@ -10,7 +10,7 @@
   (function(){var r=new URLSearchParams(location.search).get("r");if(r)location.replace("race?r="+encodeURIComponent(r))})();
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@700&family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@700&family=Lora:ital,wght@1,500&family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
 <style>
   :root{--bg:#0e1016;--panel:#171a22;--line:#262a35;--text:#ece9e4;--dim:#7a8190;--accent:#f2b84b}
   *{box-sizing:border-box}
@@ -28,6 +28,13 @@
   .space .art{background:radial-gradient(circle at 50% 30%,#1a1838,#05060d);}
   .space .art::before{content:"";position:absolute;inset:0;background-image:radial-gradient(#fff 1px,transparent 1.5px),radial-gradient(#fff 1px,transparent 1.5px);background-size:46px 46px,73px 73px;background-position:0 0,20px 30px;opacity:.5}
   .hop .art{background:linear-gradient(#1f5f8b 0 35%,#4a3f6b 35% 50%,#2c2e36 50% 100%)}
+.stack .art{background:#141822}
+  .stack .blocks{position:absolute;inset:auto 0 0 0;height:70px;background:
+    linear-gradient(90deg,#5fd4e8 0 20%,#ff9f43 20% 40%,#141822 40% 50%,#b36bff 50% 70%,#5fd48a 70% 90%,#f2d14b 90%) bottom/100% 34px no-repeat,
+    linear-gradient(90deg,#141822 0 10%,#5f8bff 10% 30%,#141822 30% 60%,#ff5c6a 60% 80%,#141822 80%) top/100% 34px no-repeat}
+  .verse .art{background:linear-gradient(135deg,#2a2335,#1b2032);align-items:center;padding:16px}
+  .vtext{font:italic 500 17px/1.5 Lora,Georgia,serif;color:#d9d4cb;text-align:center}
+  .vtext b{color:var(--accent);font-weight:500}
   .zombie .art{background:linear-gradient(#070b1a,#26304f 55%,#1c2a22 55%,#253a2a)}
   .art span{position:relative;z-index:1;margin-bottom:10px;filter:drop-shadow(0 4px 10px rgba(0,0,0,.5))}
   .word{position:absolute;z-index:2;background:rgba(10,12,18,.8);color:#fff;font:700 14px 'JetBrains Mono',monospace;padding:4px 8px;border-radius:7px}
@@ -66,6 +73,16 @@
       <div class="body"><h2>Word Hopper</h2><p>Type the word on an arrow to hop. Dodge traffic, ride logs across the river and get every frog home.</p>
         <div class="meta"><span class="best" id="bHop"></span><span class="play">Play</span></div></div>
     </a>
+    <a class="game stack" href="stack">
+      <div class="art"><div class="blocks"></div><div class="word" style="top:18px;left:18px">← <b>pi</b>ne</div><div class="word" style="top:18px;right:18px">↻ wolf</div></div>
+      <div class="body"><h2>Word Stack</h2><p>Falling blocks you steer by typing. Words move, spin and drop each piece. Clear rows before the stack hits the top.</p>
+        <div class="meta"><span class="best" id="bStack"></span><span class="play">Play</span></div></div>
+    </a>
+    <a class="game verse" href="verse">
+      <div class="art"><div class="vtext">"Thy word is a <b>lamp unto</b> my feet, and a light unto my path."</div></div>
+      <div class="body"><h2>Verse Sprint</h2><p>A new Bible verse every day. Type it as fast and accurately as you can and keep your daily streak going.</p>
+        <div class="meta"><span class="best" id="bVerse"></span><span class="play">Play</span></div></div>
+    </a>
   </div>
   <footer>Works on phones and computers. Your best scores are saved on this device.</footer>
 </main>
@@ -75,6 +92,9 @@ var r=["kr_best_easy","kr_best_med","kr_best_hard"].map(function(k){return parse
 if(r.length)document.getElementById("bRace").textContent="Best "+Math.min.apply(null,r).toFixed(2)+"s";
 if(+g("tk_best_space"))document.getElementById("bSpace").textContent="Best "+g("tk_best_space");
 if(+g("tk_best_hop"))document.getElementById("bHop").textContent="Best "+g("tk_best_hop");
+if(+g("tk_best_stack"))document.getElementById("bStack").textContent="Best "+g("tk_best_stack");
+var vsk=+(g("vs_streak")||0),vl=+(g("vs_last")||0),d=new Date(),td=Math.floor((d.getTime()-d.getTimezoneOffset()*60000)/86400000);
+if(vsk&&vl>=td-1)document.getElementById("bVerse").textContent="🔥 "+vsk+"-day streak";
 if(+g("tk_best_zombie"))document.getElementById("bZombie").textContent="Best "+g("tk_best_zombie");
 </script>
 </body>
