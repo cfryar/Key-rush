@@ -109,7 +109,7 @@
     <div class="wordsline" id="wordsline"></div>
     <div class="sub"><span id="hint" class="hint"></span><span>Streak <b id="streak">0</b> · WPM <b id="wpm">0</b></span></div>
     <input id="hidden" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
-    <div class="tap hide" id="tap">Tap here to type</div>
+    <div class="tap hide" id="tap">👆 Tap here to type</div>
   </div>
 </div>
 
@@ -221,8 +221,8 @@ function setHint(t,accent){$("hint").textContent=t;$("hint").classList.toggle("h
 function focusInput(){input.focus({preventScroll:true})}
 function activeState(){return state==="ready"||state==="countdown"||state==="racing"}
 $("game").addEventListener("click",focusInput);$("typebox").addEventListener("click",focusInput);
-input.addEventListener("focus",()=>$("tap").classList.add("hide"));
-input.addEventListener("blur",()=>{setTimeout(()=>{if(activeState()&&document.activeElement!==input)$("tap").classList.remove("hide")},50)});
+$("tap").addEventListener("click",e=>{e.stopPropagation();focusInput()});
+$("tap").addEventListener("touchend",e=>{e.preventDefault();focusInput()});
 document.addEventListener("keydown",e=>{
   if(e.key==="Escape"){if(room)leaveRoom();showMenu();return}
   if(state==="done"&&mode==="solo"&&e.key==="Enter"){e.preventDefault();newSolo();return}
@@ -409,6 +409,7 @@ function updateHud(){
   const you=$("prog").querySelector(".you");if(you)you.style.left=Math.min(100,p/TRACK*100)+"%";
   $("nitro").classList.toggle("on",streak>=8&&state==="racing");
   $("streak").textContent=streak;$("wpm").textContent=elapsed>1?Math.round(correctChars/5/(elapsed/60)):0;
+  $("tap").classList.toggle("hide",!(activeState()&&document.activeElement!==input));
   const c=$("count"),now=performance.now();
   if(state==="countdown"){c.classList.remove("hide");c.textContent=Math.max(1,Math.ceil((countdownEnd-now)/1000))}
   else if(now<goUntil){c.classList.remove("hide");c.textContent="GO!"}
