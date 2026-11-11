@@ -51,7 +51,7 @@ function fitViewport(onResize){
 function setupInput(o){
   const el=document.getElementById("tkIn"),tap=document.getElementById("tkTap");
   const focus=()=>el.focus({preventScroll:true});
-  el.addEventListener("input",()=>{const v=el.value.toLowerCase();el.value="";for(const ch of v){if(ch>="a"&&ch<="z")o.onChar(ch);else if(ch===" "&&o.onRelease)o.onRelease()}});
+  el.addEventListener("input",()=>{const v=el.value.toLowerCase();el.value="";for(const ch of v){if(ch>="a"&&ch<="z")o.onChar(ch);else if(ch===" "){if(o.acceptSpace&&o.acceptSpace())o.onChar(" ");else if(o.onRelease)o.onRelease()}}});
   el.addEventListener("keydown",e=>{if(e.key==="Backspace"||e.key==="Escape"){if(o.onRelease)o.onRelease()}});
   document.addEventListener("keydown",e=>{if(document.activeElement!==el&&o.active()&&e.key.length===1&&!(e.target&&e.target.tagName==="INPUT"))focus()});
   if(tap){tap.addEventListener("click",e=>{e.stopPropagation();focus()});tap.addEventListener("touchend",e=>{e.preventDefault();focus()})}
@@ -65,19 +65,20 @@ function makeTyper(){
     key(ch,list,danger){
       let t=this.target;if(t&&!t.alive)t=this.target=null;
       if(!t){
-        const c=list.filter(e=>e.alive&&!e.typed&&e.word[0]===ch).sort((a,b)=>danger(b)-danger(a));
+        const c=list.filter(e=>e.alive&&((!e.typed&&e.word[0]===ch)||(e.keep&&e.typed&&e.word[e.typed]===ch))).sort((a,b)=>danger(b)-danger(a));
         if(!c.length)return{miss:true};
-        t=c[0];t.typed=1;const done=t.word.length===1;this.target=done?null:t;return{hit:true,t,done};
+        t=c[0];t.typed=(t.typed||0)+1;const done=t.typed>=t.word.length;this.target=done?null:t;return{hit:true,t,done};
       }
       if(t.word[t.typed]===ch){t.typed++;const done=t.typed>=t.word.length;if(done)this.target=null;return{hit:true,t,done}}
       return{miss:true,t};
     },
-    release(){if(this.target){this.target.typed=0;this.target=null}}};
+    release(){if(this.target){if(!this.target.keep)this.target.typed=0;this.target=null}}};
 }
 
 function renderTyped(el,typer,ph){
   const t=typer.target;
-  el.innerHTML=t&&t.alive?`<span class="ok">${t.word.slice(0,t.typed)}</span><span class="rest">${t.word.slice(t.typed)}</span>`:`<span class="ph">${ph||"Type a word you see"}</span>`;
+  const a=t?Math.max(0,t.typed-10):0,b=t?Math.min(t.word.length,a+22):0;
+  el.innerHTML=t&&t.alive?`<span class="ok">${(a?"…":"")+t.word.slice(a,t.typed)}</span><span class="rest">${t.word.slice(t.typed,b)+(b<t.word.length?"…":"")}</span>`:`<span class="ph">${ph||"Type a word you see"}</span>`;
 }
 
 // Typing stats. WPM counts only time you're actually typing (gaps over 1.5s, like waiting

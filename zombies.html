@@ -30,7 +30,7 @@
 <div class="overlay" id="menu"><div class="card">
   <a class="home" href="./">← All games</a>
   <h1>Word <span>Zombies</span></h1>
-  <p>Zombies are shuffling toward your barricade. Type the word over a zombie to shoot it, and finish the word to take it down. If they reach the barricade, they start breaking it. Every 5th wave brings a big one.</p>
+  <p>Zombies are shuffling toward your barricade. Type the word over a zombie to shoot it, and finish the word to take it down. If they reach the barricade, they start breaking it. Every 5th wave brings a boss carrying a whole sentence: type all of it, spaces included.</p>
   <div class="lbl">Best score</div><div class="big" id="mBest">0</div>
   <div class="row"><button class="btn" id="playBtn">Play</button></div>
 </div></div>
@@ -49,10 +49,25 @@ const cv=$("cv"),ctx=cv.getContext("2d");let W=0,H=0;
 function resize(){const r=cv.getBoundingClientRect(),d=Math.min(2,window.devicePixelRatio||1);W=r.width;H=r.height;cv.width=W*d;cv.height=H*d;ctx.setTransform(d,0,0,d,0,0)}
 TK.fitViewport(resize);TK.setupMute($("mute"));
 
+// Boss zombies carry a full sentence (lowercase, no punctuation, so phones are easy).
+const SENTENCES=[
+"the dead are walking down main street","board up the windows and lock the doors","never split up in a haunted house",
+"this barricade will not break tonight","keep calm and type faster than the zombies","the moon is full and the night is long",
+"grab the flashlight and check the basement","nobody goes outside until the sun comes up","the radio says help is on the way",
+"they smell fear so keep your fingers moving","every word you type keeps the horde away","the last bus out of town left an hour ago",
+"stay quiet and they might walk right past","if you hear moaning do not open the door","the zombies are slow but they never stop",
+"we need more planks and a bigger hammer","a quick brown fox jumps over the lazy zombie","hold the line until the helicopter arrives",
+"brains are not on the menu tonight","my typing teacher would be proud of me right now","who left the back gate wide open",
+"run to the mall and hide in the food court","zombies cannot read but you sure can","one more wave and we can all go home",
+"do not let them reach the barricade","the generator is out of gas again","somebody bring snacks to the safe house"];
+function pickSentence(level,taken){
+  const max=level<10?40:level<15?48:99,pool=SENTENCES.filter(s=>s.length<=max);
+  const free=pool.filter(s=>!taken.has(s[0]));const p=free.length?free:pool;return p[Math.floor(Math.random()*p.length)];
+}
 const SHIRTS=["#6b5b95","#88664d","#4a6670","#7a4a4a","#5b6b3a","#3f4a73"];
 let state="menu",score=0,wave=1,hp=100,combo=0,zs=[],shots=[],parts=[],toSpawn=0,spawnT=0,banner=0,shake=0,kills=0,thumpT=0,bossLeft=0,t=0;
 const typer=TK.makeTyper();let st=TK.makeStats();
-const inp=TK.setupInput({onChar,onRelease:()=>{typer.release();TK.renderTyped($("typed"),typer)},active:()=>state==="play"});
+const inp=TK.setupInput({acceptSpace:()=>{const t=typer.target;return t?t.word[t.typed]===" ":zs.some(z=>z.keep&&z.typed&&!z.dying&&z.word[z.typed]===" ")},onChar,onRelease:()=>{typer.release();TK.renderTyped($("typed"),typer)},active:()=>state==="play"});
 const horizon=()=>H*0.34,barX=()=>Math.max(64,Math.min(110,W*0.17)),gun=()=>({x:barX()-26,y:H*0.66-34});
 function mult(){return 1+Math.min(3,Math.floor(combo/15))}
 const hills=[...Array(18)].map((_,i)=>({x:i/17,h:0.3+Math.random()*0.7}));
@@ -67,10 +82,12 @@ function startWave(n){
 }
 function spawn(boss){
   const taken=new Set(zs.filter(z=>z.alive).map(z=>z.word[0]));
-  const word=boss?TK.pickWord(wave,taken,{min:8,max:10}):TK.pickWord(wave,taken);
+  const word=boss?pickSentence(wave,taken):TK.pickWord(wave,taken);
   const hz=horizon(),y=hz+28+Math.random()*(H-hz-44),depth=(y-hz)/(H-hz),s=(0.55+0.65*depth)*(boss?1.6:1);
   const cross=(W-barX())/Math.max(8,20-wave*1.15);
-  zs.push({word,typed:0,alive:true,boss,x:W+30*s,y,s,speed:cross*(boss?0.55:(0.85+Math.random()*0.3)),
+  // Bosses walk slow enough to type the sentence: about 6s plus 0.45s per letter, never under 14s.
+  const bossSpeed=(W-barX())/Math.max(14,6+word.length*0.45);
+  zs.push({word,typed:0,alive:true,boss,keep:boss,x:W+30*s,y,s,speed:boss?bossSpeed:cross*(0.85+Math.random()*0.3),
     shirt:SHIRTS[Math.floor(Math.random()*SHIRTS.length)],ph:Math.random()*6,attacking:false,dying:0,flash:0,knock:0});
   if(boss){TK.tone(70,0.8,"sawtooth",0.12,45)}
 }
@@ -85,7 +102,7 @@ function onChar(ch){
     st.hit();combo++;const z=r.t,h=head(z),gp=gun();
     shots.push({x1:gp.x+22,y1:gp.y,x2:h.x,y2:h.y+8*z.s,life:0.07});z.flash=0.07;z.knock=0.15;
     TK.noise(0.08,3000,900,0.18);
-    if(r.done){z.dying=0.7;kills++;score+=z.word.length*10*mult()*(z.boss?3:1);burst(h.x,h.y,"#8fd16a",z.boss?40:18);
+    if(r.done){z.dying=0.7;kills++;score+=z.word.replace(/ /g,"").length*10*mult()*(z.boss?2:1);burst(h.x,h.y,"#8fd16a",z.boss?40:18);
       TK.noise(0.35,900,90,0.4,"lowpass");TK.tone(110,0.3,"sawtooth",0.06,60)}
   }
   TK.renderTyped($("typed"),typer);
@@ -143,8 +160,25 @@ function drawZombie(z){
   if(z.boss){ctx.fillStyle="#c0392b";ctx.beginPath();ctx.moveTo(-10,-72);ctx.lineTo(-6,-80);ctx.lineTo(-2,-72);ctx.lineTo(2,-80);ctx.lineTo(6,-72);ctx.fill()}
   ctx.restore();
 }
+function bossBanner(z){
+  const tgt=typer.target===z,pad=12,maxW=Math.min(W-20,560);ctx.font="700 17px 'JetBrains Mono',monospace";
+  const words=z.word.split(" "),lines=[];let cur="";
+  for(const w of words){const tryL=cur?cur+" "+w:w;if(ctx.measureText(tryL).width>maxW-pad*2&&cur){lines.push(cur);cur=w}else cur=tryL}lines.push(cur);
+  const lh=24,bh=lines.length*lh+pad*1.6+16,bx=(W-maxW)/2,by=54;
+  ctx.fillStyle="rgba(10,12,18,.88)";rr(bx,by,maxW,bh,10);ctx.strokeStyle=tgt?"#f2b84b":"#ff5c6a";ctx.lineWidth=2;ctx.stroke();
+  ctx.fillStyle="#ff8a80";ctx.font="900 11px Inter,sans-serif";ctx.textAlign="left";ctx.textBaseline="top";ctx.fillText("☠ BOSS · TYPE THE WHOLE SENTENCE",bx+pad,by+8);
+  ctx.font="700 17px 'JetBrains Mono',monospace";ctx.textBaseline="middle";let idx=0;
+  lines.forEach((ln,i)=>{let x=bx+pad;const y=by+24+pad*0.4+i*lh+lh/2;
+    for(const ch of ln){ctx.fillStyle=idx<z.typed?"#f2b84b":"#fff";ctx.fillText(ch,x,y);x+=ctx.measureText(ch).width;idx++}
+    idx++;});
+  // little tag over the boss's head
+  const tx=Math.max(30,Math.min(W-30,z.x)),ty=Math.max(60+bh,z.y-82*z.s-10);ctx.font="900 12px Inter,sans-serif";
+  const pct=Math.round(z.typed/z.word.length*100)+"%";const tw=ctx.measureText("☠ "+pct).width+12;
+  ctx.fillStyle="rgba(10,12,18,.85)";rr(tx-tw/2,ty-10,tw,20,6);ctx.fillStyle="#ff8a80";ctx.textAlign="center";ctx.fillText("☠ "+pct,tx,ty+1);
+}
 function label(z){
   if(z.dying>0)return;
+  if(z.boss){bossBanner(z);return}
   ctx.font=`700 ${z.boss?18:15}px 'JetBrains Mono',monospace`;const tw=ctx.measureText(z.word).width,pw=tw+14;
   const x=Math.max(pw/2+4,Math.min(W-pw/2-4,z.x)),y=Math.max(60,z.y-82*z.s-12),tgt=typer.target===z;
   ctx.fillStyle=tgt?"rgba(242,184,75,.2)":"rgba(10,12,18,.8)";rr(x-pw/2,y-12,pw,24,7);
