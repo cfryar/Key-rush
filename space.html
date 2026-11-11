@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
+<title>Word Blaster · Key Rush</title>
+<meta name="description" content="Type the words on the asteroids to blast them before they hit your ship.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="typekit.css">
+</head>
+<body>
+<div id="wrap">
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div class="hud">
+      <a class="pill" href="./" aria-label="All games">⌂</a>
+      <span class="pill" id="score">0</span><span class="pill mult" id="mult">x1</span>
+      <span class="sp"></span>
+      <span class="pill" id="wave">Wave 1</span><span class="pill" id="lives"></span>
+      <button class="pill" id="mute" aria-label="Sound on or off"></button>
+    </div>
+  </div>
+  <div class="typedbar" id="typedbar"><span id="typed"></span>
+    <input id="tkIn" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <div id="tkTap" class="tap hide">👆 Tap here to type</div>
+  </div>
+</div>
+
+<div class="overlay" id="menu"><div class="card">
+  <a class="home" href="./">← All games</a>
+  <h1>Word <span>Blaster</span></h1>
+  <p>Asteroids are flying at your ship. Type the word on one to lock on and fire. Finish the word to blow it up. Don't let them hit you. You get 3 lives.</p>
+  <div class="lbl">Best score</div><div class="big" id="mBest">0</div>
+  <div class="row"><button class="btn" id="playBtn">Play</button></div>
+</div></div>
+
+<div class="overlay hide" id="over"><div class="card">
+  <h1>Game <span>over</span></h1>
+  <div class="lbl" style="margin-top:14px">Score</div><div class="big" id="oScore">0</div>
+  <p id="oStats"></p>
+  <div class="row"><button class="btn" id="againBtn">Play again</button><a class="btn alt" href="./">All games</a></div>
+</div></div>
+
+<script src="typekit.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const cv=$("cv"),ctx=cv.getContext("2d");let W=0,H=0;
+function resize(){const r=cv.getBoundingClientRect(),d=Math.min(2,window.devicePixelRatio||1);W=r.width;H=r.height;cv.width=W*d;cv.height=H*d;ctx.setTransform(d,0,0,d,0,0)}
+TK.fitViewport(resize);TK.setupMute($("mute"));
+
+let state="menu",score=0,wave=1,lives=3,combo=0,enemies=[],bolts=[],parts=[],toSpawn=0,spawnT=0,banner=0,shake=0,shipAng=-Math.PI/2,hits=0,misses=0,kills=0;
+const typer=TK.makeTyper();
+const inp=TK.setupInput({onChar,onRelease:()=>{typer.release();TK.renderTyped($("typed"),typer)},active:()=>state==="play"});
+const stars=[...Array(140)].map(()=>({x:Math.random(),y:Math.random(),z:Math.random()}));
+const ship=()=>({x:W/2,y:H-44});
+function mult(){return 1+Math.min(3,Math.floor(combo/15))}
+
+function start(){
+  TK.init();score=0;lives=3;combo=0;enemies=[];bolts=[];parts=[];hits=0;misses=0;kills=0;typer.target=null;
+  state="play";startWave(1);$("menu").classList.add("hide");$("over").classList.add("hide");TK.renderTyped($("typed"),typer);inp.focus();
+}
+function startWave(n){wave=n;toSpawn=5+n*2;spawnT=0.4;banner=2;if(n>1){TK.tone(523,0.15,"triangle",0.12);TK.tone(784,0.25,"triangle",0.12,0,0.12)}}
+function spawn(){
+  const taken=new Set(enemies.filter(e=>e.alive).map(e=>e.word[0]));
+  const word=TK.pickWord(wave,taken),r=13+word.length*2.2;
+  enemies.push({word,typed:0,alive:true,x:30+Math.random()*(W-60),y:-r-10,r,
+    speed:H/Math.max(5.5,15-wave*0.9)*(0.85+Math.random()*0.3),rot:Math.random()*6,spin:(Math.random()-.5)*1.6,
+    shape:[...Array(9)].map(()=>0.75+Math.random()*0.4),flash:0,knock:0});
+}
+function explode(x,y,col,n){for(let i=0;i<n;i++){const a=Math.random()*7,s=40+Math.random()*220;parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:0.4+Math.random()*0.5,col})}}
+
+function onChar(ch){
+  if(state!=="play")return;
+  const r=typer.key(ch,enemies,e=>e.y);
+  if(r.miss){combo=0;misses++;TK.tone(150,0.09,"square",0.05)}
+  else{
+    hits++;combo++;const t=r.t,s=ship();
+    bolts.push({x1:s.x,y1:s.y-16,x2:t.x,y2:t.y,life:0.09});t.flash=0.07;t.knock=0.12;
+    shipAng=Math.atan2(t.y-s.y,t.x-s.x);TK.tone(1500,0.07,"square",0.035,500);
+    if(r.done){t.alive=false;kills++;score+=t.word.length*10*mult();explode(t.x,t.y,"#f2b84b",22);explode(t.x,t.y,"#8a8199",10);TK.noise(0.45,1500,90,0.35)}
+  }
+  TK.renderTyped($("typed"),typer);
+}
+function hurt(e){
+  lives--;shake=16;explode(e.x,e.y,"#ff5c6a",30);TK.noise(0.6,700,50,0.55,"lowpass");TK.buzz(160);combo=0;
+  if(typer.target===e)typer.target=null;TK.renderTyped($("typed"),typer);
+  if(lives<=0)gameOver();
+}
+function gameOver(){
+  state="over";inp.blur();const best=+(TK.store("tk_best_space")||0),nb=score>best;if(nb)TK.store("tk_best_space",String(score));
+  TK.tone(400,0.3,"sawtooth",0.08,120);
+  $("oScore").textContent=score;
+  const acc=hits+misses?Math.round(hits/(hits+misses)*100):0;
+  $("oStats").innerHTML=`Wave ${wave} · ${kills} asteroids · ${acc}% accuracy<br>${nb?"🎉 New best score!":`Best: ${Math.max(best,score)}`}`;
+  setTimeout(()=>$("over").classList.remove("hide"),600);
+}
+
+function update(dt){
+  for(const s of stars){s.y+=(0.02+s.z*0.08)*dt;if(s.y>1){s.y=0;s.x=Math.random()}}
+  if(state==="play"){
+    if(banner>0)banner-=dt;
+    else{spawnT-=dt;if(toSpawn>0&&spawnT<=0){spawn();toSpawn--;spawnT=Math.max(0.55,2.1-wave*0.13)*(0.7+Math.random()*0.6)}}
+    const s=ship();
+    for(const e of enemies){if(!e.alive)continue;
+      const dx=s.x-e.x,dy=s.y-e.y,d=Math.hypot(dx,dy)||1,v=e.speed*(e.knock>0?0.15:1);
+      e.x+=dx/d*v*dt;e.y+=dy/d*v*dt;e.rot+=e.spin*dt;e.knock-=dt;e.flash-=dt;
+      if(d<e.r+16){e.alive=false;hurt(e);if(state!=="play")break}}
+    enemies=enemies.filter(e=>e.alive);
+    if(state==="play"&&toSpawn===0&&banner<=0&&!enemies.length){score+=100*wave;startWave(wave+1)}
+  }
+  bolts.forEach(b=>b.life-=dt);bolts=bolts.filter(b=>b.life>0);
+  parts.forEach(p=>{p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=0.97;p.vy*=0.97;p.life-=dt});parts=parts.filter(p=>p.life>0);
+  shake*=Math.pow(0.03,dt);
+}
+
+function label(e){
+  ctx.font="700 16px 'JetBrains Mono',monospace";const tw=ctx.measureText(e.word).width,pw=tw+14;
+  const x=Math.max(pw/2+4,Math.min(W-pw/2-4,e.x)),y=Math.max(60,e.y-e.r-16),tgt=typer.target===e;
+  ctx.fillStyle=tgt?"rgba(242,184,75,.18)":"rgba(10,12,18,.78)";ctx.beginPath();ctx.roundRect?ctx.roundRect(x-pw/2,y-12,pw,24,7):ctx.rect(x-pw/2,y-12,pw,24);ctx.fill();
+  if(tgt){ctx.strokeStyle="#f2b84b";ctx.lineWidth=2;ctx.stroke()}
+  ctx.textAlign="left";ctx.textBaseline="middle";let cx=x-tw/2;
+  const a=e.word.slice(0,e.typed),b=e.word.slice(e.typed);
+  ctx.fillStyle="#f2b84b";ctx.fillText(a,cx,y+1);cx+=ctx.measureText(a).width;ctx.fillStyle="#fff";ctx.fillText(b,cx,y+1);
+}
+function render(){
+  const g=ctx.createRadialGradient(W*0.5,H*0.3,10,W*0.5,H*0.5,Math.max(W,H));g.addColorStop(0,"#1a1838");g.addColorStop(1,"#05060d");
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  for(const s of stars){ctx.fillStyle=`rgba(255,255,255,${0.25+s.z*0.7})`;const r=0.5+s.z*1.4;ctx.fillRect(s.x*W,s.y*H,r,r)}
+  ctx.save();if(shake>0.5)ctx.translate((Math.random()-.5)*shake,(Math.random()-.5)*shake);
+  for(const e of enemies){
+    ctx.save();ctx.translate(e.x,e.y);ctx.rotate(e.rot);ctx.beginPath();
+    e.shape.forEach((k,i)=>{const a=i/e.shape.length*Math.PI*2;const px=Math.cos(a)*e.r*k,py=Math.sin(a)*e.r*k;i?ctx.lineTo(px,py):ctx.moveTo(px,py)});ctx.closePath();
+    ctx.fillStyle=e.flash>0?"#fff":"#5a5266";ctx.fill();ctx.lineWidth=2;ctx.strokeStyle=typer.target===e?"#f2b84b":"#8a8199";ctx.stroke();
+    ctx.fillStyle="rgba(0,0,0,.2)";ctx.beginPath();ctx.arc(e.r*0.25,-e.r*0.2,e.r*0.22,0,7);ctx.fill();ctx.restore();
+  }
+  for(const b of bolts){ctx.strokeStyle="#7df9ff";ctx.lineWidth=3;ctx.shadowColor="#7df9ff";ctx.shadowBlur=12;ctx.beginPath();ctx.moveTo(b.x1,b.y1);ctx.lineTo(b.x2,b.y2);ctx.stroke();ctx.shadowBlur=0}
+  for(const p of parts){ctx.globalAlpha=Math.min(1,p.life*2);ctx.fillStyle=p.col;ctx.fillRect(p.x-2,p.y-2,4,4)}ctx.globalAlpha=1;
+  if(state!=="over"||lives>0){const s=ship();ctx.save();ctx.translate(s.x,s.y);ctx.rotate(shipAng+Math.PI/2);
+    ctx.fillStyle="#ff9f43";ctx.beginPath();ctx.moveTo(-6,14);ctx.lineTo(0,22+Math.random()*10);ctx.lineTo(6,14);ctx.fill();
+    ctx.fillStyle="#e8ecf5";ctx.beginPath();ctx.moveTo(0,-20);ctx.lineTo(15,14);ctx.lineTo(0,8);ctx.lineTo(-15,14);ctx.closePath();ctx.fill();
+    ctx.fillStyle="#5fb0ff";ctx.beginPath();ctx.ellipse(0,-3,4,7,0,0,7);ctx.fill();ctx.restore()}
+  for(const e of enemies)label(e);
+  if(banner>0&&state==="play"){ctx.globalAlpha=Math.min(1,banner);ctx.fillStyle="#fff";ctx.font="900 44px Inter,sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";
+    ctx.fillText(`WAVE ${wave}`,W/2,H*0.4);ctx.globalAlpha=1}
+  ctx.restore();
+}
+function hud(){$("score").textContent=score;$("mult").textContent="x"+mult();$("wave").textContent="Wave "+wave;$("lives").textContent="❤️".repeat(Math.max(0,lives))||"💀"}
+
+$("playBtn").addEventListener("click",start);$("againBtn").addEventListener("click",start);
+document.addEventListener("keydown",e=>{if(e.key==="Enter"&&state!=="play"){e.preventDefault();start()}});
+$("mBest").textContent=TK.store("tk_best_space")||0;
+let last=performance.now();
+function loop(now){const dt=Math.min(0.05,(now-last)/1000);last=now;update(dt);render();hud();inp.tick();requestAnimationFrame(loop)}
+TK.renderTyped($("typed"),typer);requestAnimationFrame(loop);
+</script>
+</body>
+</html>
