@@ -33,6 +33,20 @@
   .count{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:900 96px Inter,sans-serif;color:#fff;text-shadow:0 6px 30px rgba(0,0,0,.6);pointer-events:none}
   .flash{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .35s}
   .flash.bad{background:rgba(255,60,80,.28);opacity:1;transition:none}
+  .flash.shield{background:rgba(95,176,255,.3);opacity:1;transition:none}
+  .rt{display:flex;gap:8px;align-items:flex-start}
+  .mute{pointer-events:auto;cursor:pointer;border:0;color:#fff;font-size:16px;line-height:1}
+  .badges{position:absolute;right:12px;bottom:12px;display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+  .badges .nitro{position:static}
+  .badge{font:900 15px Inter,sans-serif;color:#0e1016;padding:5px 10px;border-radius:8px}
+  .badge.sh{background:#5fb0ff}
+  .cur.pw-turbo{background:rgba(242,184,75,.2);box-shadow:0 0 18px rgba(242,184,75,.45)}
+  .cur.pw-shield{background:rgba(95,176,255,.2);box-shadow:0 0 18px rgba(95,176,255,.45)}
+  .cur .ic{font-size:22px;margin-right:6px;vertical-align:3px}
+  .next .ic{font-size:14px}
+  .sw{display:flex;gap:6px;justify-content:center;margin-top:10px;flex-wrap:wrap}
+  .sw button{width:30px;height:30px;border-radius:50%;border:3px solid transparent;cursor:pointer;padding:0}
+  .sw button.on{border-color:#fff;box-shadow:0 0 0 2px var(--bg)}
   .typebox{background:var(--panel);border-top:1px solid var(--line);padding:16px 16px 14px;position:relative;cursor:text}
   .wordsline{font-family:'JetBrains Mono',monospace;display:flex;align-items:baseline;gap:14px;overflow:hidden;white-space:nowrap;min-height:46px}
   .cur{font-size:34px;font-weight:700;padding:0 6px;border-radius:8px;transition:background .2s}
@@ -97,11 +111,11 @@
     <div class="hud">
       <div class="top">
         <div class="pill pos"><span id="posN">1st</span><small id="gap"></small></div>
-        <div class="pill" id="clock">0.00s</div>
+        <div class="rt"><button class="pill mute" id="muteBtn" aria-label="Sound on or off">🔊</button><div class="pill" id="clock">0.00s</div></div>
       </div>
       <div class="prog" id="prog"></div>
       <div class="speedo"><span class="n" id="mph">0</span><span class="u">MPH</span></div>
-      <div class="nitro" id="nitro">🔥 NITRO</div>
+      <div class="badges"><div class="badge sh hide" id="shieldB">🛡️ SHIELD</div><div class="nitro" id="nitro">🔥 NITRO</div></div>
     </div>
     <div class="count hide" id="count"></div>
   </div>
@@ -116,9 +130,10 @@
 <div class="overlay" id="menu">
   <div class="card">
     <h1>Key<span>Rush</span></h1>
-    <p class="tag">Every word you type right makes you faster. Miss one and you skid. 8 in a row lights up nitro. First to the 1-mile flag wins.</p>
+    <p class="tag">Every word you type right makes you faster. Miss one and you skid. 8 in a row lights up nitro. Glowing words are power-ups: ⚡ turbo boost or 🛡️ a shield that saves your next mistake. First to the 1-mile flag wins.</p>
     <div class="sec">Race your friends</div>
     <input class="f" id="nameIn" maxlength="14" placeholder="Your name">
+    <div class="sw" id="swatches" aria-label="Car color"></div>
     <div class="row"><button class="btn" id="createBtn">Create race</button></div>
     <div class="row"><input class="f code" id="codeIn" maxlength="4" placeholder="CODE"><button class="btn alt" id="joinBtn">Join</button></div>
     <div class="err" id="mErr"></div>
@@ -168,6 +183,50 @@ function ord(n){return n+(["th","st","nd","rd"][(n%100-20)%10]||["th","st","nd",
 function toast(m){const t=$("toast");t.textContent=m;t.classList.add("on");clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove("on"),2200)}
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 
+// ---------- car colors ----------
+const COLORS=["#f2b84b","#ff5c6a","#5fb0ff","#5fd48a","#b36bff","#ff9f43","#f368e0","#e9e9e9"];
+function okColor(c){return typeof c==="string"&&/^#[0-9a-f]{6}$/i.test(c)}
+function shade(hex,f){const n=parseInt(hex.slice(1),16),r=n>>16&255,g=n>>8&255,b=n&255,h=v=>Math.round(v*f).toString(16).padStart(2,"0");return "#"+h(r)+h(g)+h(b)}
+let myColor=okColor(store("kr_color"))?store("kr_color"):COLORS[0];
+function renderSwatches(){$("swatches").innerHTML=COLORS.map(c=>`<button style="background:${c}" data-c="${c}" class="${c===myColor?"on":""}" aria-label="Car color ${c}"></button>`).join("")}
+
+// ---------- sound ----------
+let AC=null,eng=null,noiseBuf=null,muted=store("kr_mute")==="1",lastBeep=0,wasNitro=false;
+function audioInit(){
+  if(AC){if(AC.state==="suspended")AC.resume().catch(()=>{});return}
+  try{AC=new(window.AudioContext||window.webkitAudioContext)()}catch(e){AC=null;return}
+  const o=AC.createOscillator(),o2=AC.createOscillator(),f=AC.createBiquadFilter(),g=AC.createGain();
+  o.type="sawtooth";o2.type="square";f.type="lowpass";f.frequency.value=500;g.gain.value=0;
+  o.connect(f);o2.connect(f);f.connect(g);g.connect(AC.destination);o.start();o2.start();eng={o,o2,f,g};
+  noiseBuf=AC.createBuffer(1,AC.sampleRate,AC.sampleRate);const d=noiseBuf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+}
+document.addEventListener("pointerdown",audioInit,{passive:true});document.addEventListener("keydown",audioInit);
+function engineTick(){
+  if(!eng)return;const t=AC.currentTime,on=!muted&&(state==="racing"||state==="done"||state==="countdown");
+  const fr=42+speed*1.1;eng.o.frequency.setTargetAtTime(fr,t,0.08);eng.o2.frequency.setTargetAtTime(fr*0.5,t,0.08);
+  eng.f.frequency.setTargetAtTime(380+speed*8,t,0.1);eng.g.gain.setTargetAtTime(on?0.03+speed*0.00025:0,t,0.15);
+}
+function tone(freq,dur,type,vol,when){if(!AC||muted)return;const o=AC.createOscillator(),g=AC.createGain(),t=AC.currentTime+(when||0);
+  o.type=type||"sine";o.frequency.value=freq;g.gain.setValueAtTime(vol||0.15,t);g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+  o.connect(g);g.connect(AC.destination);o.start(t);o.stop(t+dur+0.05)}
+function noise(dur,f0,f1,vol){if(!AC||muted||!noiseBuf)return;const s=AC.createBufferSource(),bp=AC.createBiquadFilter(),g=AC.createGain(),t=AC.currentTime;
+  s.buffer=noiseBuf;bp.type="bandpass";bp.Q.value=1.2;bp.frequency.setValueAtTime(f0,t);bp.frequency.exponentialRampToValueAtTime(f1,t+dur);
+  g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(0.001,t+dur);s.connect(bp);bp.connect(g);g.connect(AC.destination);s.start(t);s.stop(t+dur)}
+const sfx={
+  skid:()=>noise(0.35,2600,600,0.4),
+  whoosh:()=>noise(0.6,300,3200,0.32),
+  turbo:()=>{tone(660,0.12,"triangle",0.15);tone(990,0.2,"triangle",0.15,0.09)},
+  shield:()=>{tone(520,0.25,"sine",0.18);tone(780,0.3,"sine",0.12,0.06)},
+  block:()=>{tone(300,0.15,"triangle",0.16);tone(600,0.2,"sine",0.1,0.05)},
+  beep:()=>tone(440,0.15,"square",0.07),go:()=>tone(880,0.35,"square",0.08),
+  win:()=>[523,659,784,1047].forEach((f,i)=>tone(f,0.28,"triangle",0.14,i*0.12))};
+function buzz(ms){try{navigator.vibrate&&navigator.vibrate(ms)}catch(e){}}
+function renderMute(){$("muteBtn").textContent=muted?"🔇":"🔊"}
+
+// ---------- power-ups: every 10th word ----------
+function powerAt(i){return i%10===9?(Math.floor(i/10)%2===0?"turbo":"shield"):null}
+let shield=false,turboUntil=0;
+
 // ---------- state ----------
 const myId=Math.random().toString(36).slice(2,10);
 let myName=store("kr_name")||"";
@@ -179,7 +238,7 @@ let opponents=[],room=null;
 function randWords(n){const a=[];for(let i=0;i<n;i++){let w;do{w=WORDS[Math.floor(rng()*WORDS.length)]}while(a.length&&w===a[a.length-1]);a.push(w)}return a}
 function setupRace(opps,seed){
   rng=seed!=null?mulberry32(seed):Math.random;
-  p=0;speed=0;pending=0;elapsed=0;shake=0;lastSend=0;
+  p=0;speed=0;pending=0;elapsed=0;shake=0;lastSend=0;shield=false;turboUntil=0;lastBeep=0;wasNitro=false;
   words=randWords(150);idx=0;cur="";streak=0;keys=0;good=0;correctChars=0;
   opponents=opps;input.value="";renderWords();buildDots();
   ["menu","lobby","results"].forEach(id=>$(id).classList.add("hide"));
@@ -191,7 +250,8 @@ function newSolo(rv){
   if(room)leaveRoom();
   mode="solo";rival=rv||rival;
   setLanes(2,1);
-  setupRace([{id:"ai",ai:true,name:rival.name,mph:rival.mph,color:rival.color,dark:rival.dark,p:0,speed:0,lane:0}],null);
+  const rc=rival.color===myColor?COLORS.find(c=>c!==myColor&&c!=="#e9e9e9"):rival.color;
+  setupRace([{id:"ai",ai:true,name:rival.name,mph:rival.mph,color:rc,dark:shade(rc,0.62),p:0,speed:0,lane:0}],null);
   state="ready";setHint("Type the first word to launch",true);focusInput();
 }
 
@@ -207,9 +267,14 @@ input.addEventListener("input",()=>{
 });
 function commit(t){
   const w=words[idx];keys++;
+  const f=$("flash"),flash=cls=>{f.classList.add(cls);requestAnimationFrame(()=>requestAnimationFrame(()=>f.classList.remove(cls)))};
   if(t===w){good++;correctChars+=w.length+1;streak++;let b=26*(w.length+1)/5;if(streak>=8)b*=1.3;pending+=b;
-    const c=$("wordsline").querySelector(".cur");if(c)c.classList.add("good")}
-  else{speed*=0.6;pending=0;streak=0;shake=16;const f=$("flash");f.classList.add("bad");requestAnimationFrame(()=>requestAnimationFrame(()=>f.classList.remove("bad")))}
+    const c=$("wordsline").querySelector(".cur");if(c)c.classList.add("good");
+    const pw=powerAt(idx);
+    if(pw==="turbo"){pending+=55;turboUntil=performance.now()+2200;sfx.turbo();sfx.whoosh();buzz(40)}
+    else if(pw==="shield"){shield=true;sfx.shield()}}
+  else if(shield){shield=false;shake=5;flash("shield");sfx.block()}
+  else{speed*=0.6;pending=0;streak=0;shake=16;flash("bad");sfx.skid();buzz(120)}
   idx++;if(idx>words.length-20)words.push(...randWords(100));
 }
 function renderWords(){
@@ -220,7 +285,9 @@ function renderWords(){
     else h+=`<span class="x">${esc(t[k])}</span>`;
   }
   if(t.length>=w.length)h+='<span class="caret"></span>';
-  $("wordsline").innerHTML=`<span class="cur">${h}</span><span class="next">${words.slice(idx+1,idx+6).join(" ")}</span>`;
+  const IC={turbo:"⚡",shield:"🛡️"},pw=powerAt(idx);
+  const nxt=words.slice(idx+1,idx+6).map((x,j)=>{const q=powerAt(idx+1+j);return q?`<span class="ic">${IC[q]}</span>${x}`:x}).join(" ");
+  $("wordsline").innerHTML=`<span class="cur${pw?" pw-"+pw:""}">${pw?`<span class="ic">${IC[pw]}</span>`:""}${h}</span><span class="next">${nxt}</span>`;
 }
 function setHint(t,accent){$("hint").textContent=t;$("hint").classList.toggle("hint",!!accent)}
 function focusInput(){input.focus({preventScroll:true})}
@@ -241,9 +308,11 @@ function showMenu(msg){
     return `<button class="opt" data-id="${rv.id}"><span>${rv.name}<small>${rv.desc}</small></span><span class="best">${b?"best "+fmt(b):""}</span></button>`}).join("");
   $("mErr").textContent=msg||"";$("mErr").style.color="";
   if(!sb){$("mErr").textContent="Multiplayer isn't available right now — solo still works.";$("createBtn").disabled=true;$("joinBtn").disabled=true}
-  $("nameIn").value=myName;
+  $("nameIn").value=myName;renderSwatches();
   hideOverlays();$("menu").classList.remove("hide");
 }
+$("swatches").addEventListener("click",e=>{const b=e.target.closest("button[data-c]");if(!b)return;myColor=b.dataset.c;store("kr_color",myColor);renderSwatches();buildDots()});
+$("muteBtn").addEventListener("click",e=>{e.stopPropagation();audioInit();muted=!muted;store("kr_mute",muted?"1":"0");renderMute()});
 $("opts").addEventListener("click",e=>{const b=e.target.closest(".opt");if(b)newSolo(RIVALS.find(x=>x.id===b.dataset.id))});
 function needName(){const n=$("nameIn").value.trim();if(!n){$("mErr").textContent="Type your name first so friends know who you are.";$("nameIn").focus();return null}return n.slice(0,14)}
 $("createBtn").addEventListener("click",()=>{const n=needName();if(n)enterRoom(makeCode(),true,n)});
@@ -273,7 +342,7 @@ function enterRoom(code,creating,name){
     .subscribe(async status=>{
       if(room!==r)return;
       if(status==="SUBSCRIBED"){
-        r.ready=true;await ch.track({id:myId,name,joinedAt:r.joinedAt});renderLobby();
+        r.ready=true;await ch.track({id:myId,name,joinedAt:r.joinedAt,color:myColor});renderLobby();
         if(!creating)setTimeout(()=>{if(room===r&&r.players.size<=1){leaveRoom();showMenu(`No race found with code ${code}. Check the code and try again.`)}},3000);
       }else if(status==="CHANNEL_ERROR"||status==="TIMED_OUT"){leaveRoom();showMenu("Couldn't connect. Check your internet and try again.")}
     });
@@ -286,7 +355,7 @@ function leaveRoom(){
 }
 function onPresence(){
   const st=room.ch.presenceState(),m=new Map();
-  for(const k in st){const meta=st[k][0];if(meta){const id=meta.id||k;m.set(id,{id,name:String(meta.name||"Player").slice(0,14),joinedAt:+meta.joinedAt||0})}}
+  for(const k in st){const meta=st[k][0];if(meta){const id=meta.id||k;m.set(id,{id,name:String(meta.name||"Player").slice(0,14),joinedAt:+meta.joinedAt||0,color:okColor(meta.color)?meta.color:null})}}
   room.players=m;const arr=sortedPlayers();room.hostId=arr.length?arr[0].id:null;
   if(state==="lobby")renderLobby();if(state==="done")renderMultiResults();
 }
@@ -322,8 +391,8 @@ function onStart(pl){
   room.results={};mode="multi";
   const now=performance.now();
   setLanes(pl.players.length,pl.players.indexOf(myId));
-  const opps=pl.players.filter(id=>id!==myId).map((id,i)=>{const x=room.players.get(id),c=PAL[i%PAL.length];
-    return{id,name:x?x.name:"Player",color:c[0],dark:c[1],p:0,dispP:0,speed:0,lastT:now,lane:pl.players.indexOf(id),finished:false}});
+  const opps=pl.players.filter(id=>id!==myId).map((id,i)=>{const x=room.players.get(id),col=x&&x.color?x.color:PAL[i%PAL.length][0];
+    return{id,name:x?x.name:"Player",color:col,dark:shade(col,0.62),p:0,dispP:0,speed:0,lastT:now,lane:pl.players.indexOf(id),finished:false}});
   setupRace(opps,pl.seed|0);
   state="countdown";countdownEnd=performance.now()+3000;setHint("Get ready…",true);focusInput();
 }
@@ -340,12 +409,13 @@ function finishMe(dnf){
   const wpm=elapsed>1?Math.round(correctChars/5/(elapsed/60)):0,acc=keys?Math.round(good/keys*100):0;
   if(mode==="multi"&&room){
     const r={id:myId,time:elapsed,wpm,acc,dnf};room.results[myId]=r;send("finish",r);
+    if(!dnf&&!Object.values(room.results).some(x=>x.id!==myId&&!x.dnf&&x.time<elapsed))sfx.win();
     setTimeout(()=>{if(state==="done"){renderMultiResults();$("results").classList.remove("hide")}},700);
     return;
   }
   const ai=opponents[0];
   const rT=ai.finishedAt||(elapsed+(TRACK-ai.p)/(rival.mph*UPM));
-  const won=!dnf&&elapsed<=rT;
+  const won=!dnf&&elapsed<=rT;if(won)sfx.win();
   let msg="";
   if(!dnf){const k="kr_best_"+rival.id,prev=parseFloat(store(k)||"0");
     if(!prev||elapsed<prev){store(k,elapsed.toFixed(2));msg=prev?`🎉 New best vs ${rival.name}! (was ${fmt(prev)})`:"🎉 First time saved as your best"}
@@ -379,7 +449,7 @@ $("results").addEventListener("click",e=>{const b=e.target.closest("[data-act]")
 // ---------- update ----------
 function update(dt){
   const now=performance.now();
-  if(state==="countdown"&&now>=countdownEnd){state="racing";goUntil=now+700;setHint("Go go go!",true)}
+  if(state==="countdown"&&now>=countdownEnd){state="racing";goUntil=now+700;setHint("Go go go!",true);sfx.go()}
   if(state==="racing"){
     elapsed+=dt;
     const take=pending*Math.min(1,dt*5);speed+=take;pending-=take;
@@ -403,7 +473,7 @@ function update(dt){
   shake*=Math.pow(0.02,dt);
 }
 function oppP(o){return o.ai?o.p:o.dispP}
-function buildDots(){$("prog").innerHTML=opponents.map((o,i)=>`<div class="dot" data-i="${i}" style="background:${o.color}"></div>`).join("")+'<div class="dot you" style="background:#f2b84b"></div><span class="flag">🏁</span>'}
+function buildDots(){$("prog").innerHTML=opponents.map((o,i)=>`<div class="dot" data-i="${i}" style="background:${o.color}"></div>`).join("")+`<div class="dot you" style="background:${myColor};border-color:#fff"></div><span class="flag">🏁</span>`}
 function updateHud(){
   $("mph").textContent=Math.round(speed);$("clock").textContent=fmt(elapsed);
   const total=opponents.length+1,rank=1+opponents.filter(o=>oppP(o)>p).length;
@@ -413,11 +483,14 @@ function updateHud(){
   const dots=$("prog").children;
   for(let i=0;i<opponents.length&&i<dots.length;i++)dots[i].style.left=Math.min(100,oppP(opponents[i])/TRACK*100)+"%";
   const you=$("prog").querySelector(".you");if(you)you.style.left=Math.min(100,p/TRACK*100)+"%";
-  $("nitro").classList.toggle("on",streak>=8&&state==="racing");
+  const turbo=performance.now()<turboUntil&&state==="racing",nitro=streak>=8&&state==="racing";
+  $("nitro").textContent=turbo?"⚡ TURBO":"🔥 NITRO";$("nitro").classList.toggle("on",turbo||nitro);
+  if(nitro&&!wasNitro)sfx.whoosh();wasNitro=nitro;
+  $("shieldB").classList.toggle("hide",!(shield&&activeState()));
   $("streak").textContent=streak;$("wpm").textContent=elapsed>1?Math.round(correctChars/5/(elapsed/60)):0;
   $("tap").classList.toggle("hide",!(activeState()&&document.activeElement!==input));
   const c=$("count"),now=performance.now();
-  if(state==="countdown"){c.classList.remove("hide");c.textContent=Math.max(1,Math.ceil((countdownEnd-now)/1000))}
+  if(state==="countdown"){const n=Math.max(1,Math.ceil((countdownEnd-now)/1000));if(n!==lastBeep){lastBeep=n;sfx.beep()}c.classList.remove("hide");c.textContent=n}
   else if(now<goUntil){c.classList.remove("hide");c.textContent="GO!"}
   else c.classList.add("hide");
 }
@@ -482,12 +555,14 @@ function render(){
       if(n>=0&&n<DRAW){const xw=pts[n].xw+(pts[n+1].xw-pts[n].xw)*t,sc=CAMD/rel,lx=laneX(o.lane);
         spr.push({z:rel,draw:()=>car(W/2+sc*(xw+lx-camX)*k,hy+sc*CAMH*vs,sc*CARW*k*fac,o.color,o.dark,false,mode==="multi"?o.name:"")})}}}
   spr.sort((a,b)=>b.z-a.z).forEach(s=>s.draw());
-  if(speed>85){ctx.strokeStyle=`rgba(255,255,255,${Math.min(.5,(speed-85)/200)})`;ctx.lineWidth=2;
+  if(speed>85||performance.now()<turboUntil){ctx.strokeStyle=`rgba(255,255,255,${Math.min(.5,(speed-85)/200)})`;ctx.lineWidth=2;
     for(let i=0;i<14;i++){const x0=i%2?Math.random()*W*0.22:W-Math.random()*W*0.22,y0=hy+Math.random()*vs;
       const vx=x0-W/2,vy=y0-hy,L=20+Math.random()*50,m=Math.hypot(vx,vy)||1;
       ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x0+vx/m*L,y0+vy/m*L);ctx.stroke()}}
-  const bounce=speed>5?Math.sin(performance.now()/40)*1.2:0;
-  car(W/2,H-6+bounce,pw,"#f2b84b","#b9862a",streak>=8&&state==="racing","");
+  const bounce=speed>5?Math.sin(performance.now()/40)*1.2:0,boosting=(streak>=8||performance.now()<turboUntil)&&state==="racing";
+  car(W/2,H-6+bounce,pw,myColor,shade(myColor,0.62),boosting,"");
+  if(shield&&activeState()){const t=performance.now()/300;ctx.strokeStyle=`rgba(95,176,255,${0.55+0.25*Math.sin(t)})`;ctx.lineWidth=3;
+    ctx.fillStyle="rgba(95,176,255,.12)";ctx.beginPath();ctx.ellipse(W/2,H-6-pw*0.3,pw*0.66,pw*0.42,0,0,7);ctx.fill();ctx.stroke()}
   ctx.restore();
 }
 
@@ -495,8 +570,8 @@ function render(){
 function resize(){const b=cv.getBoundingClientRect(),d=Math.min(2,window.devicePixelRatio||1);W=b.width;H=b.height;cv.width=W*d;cv.height=H*d;ctx.setTransform(d,0,0,d,0,0)}
 window.addEventListener("resize",resize);
 let last=performance.now();
-function loop(now){const dt=Math.min(0.05,(now-last)/1000);last=now;update(dt);render();updateHud();requestAnimationFrame(loop)}
-resize();words=randWords(150);renderWords();buildDots();
+function loop(now){const dt=Math.min(0.05,(now-last)/1000);last=now;update(dt);render();updateHud();engineTick();requestAnimationFrame(loop)}
+resize();words=randWords(150);renderWords();buildDots();renderMute();
 const params=new URLSearchParams(location.search),invite=(params.get("r")||"").toUpperCase().slice(0,4);
 showMenu();
 if(invite){$("codeIn").value=invite;$("mErr").textContent=myName?`Tap Join to enter race ${invite}.`:`Type your name, then tap Join to enter race ${invite}.`;$("mErr").style.color="var(--accent)"}
