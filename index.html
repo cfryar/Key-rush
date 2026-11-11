@@ -27,6 +27,7 @@
   .race .road{position:absolute;bottom:0;left:50%;width:0;height:0;border-left:120px solid transparent;border-right:120px solid transparent;border-bottom:62px solid #53545c;transform:translateX(-50%)}
   .space .art{background:radial-gradient(circle at 50% 30%,#1a1838,#05060d);}
   .space .art::before{content:"";position:absolute;inset:0;background-image:radial-gradient(#fff 1px,transparent 1.5px),radial-gradient(#fff 1px,transparent 1.5px);background-size:46px 46px,73px 73px;background-position:0 0,20px 30px;opacity:.5}
+  .hop .art{background:linear-gradient(#1f5f8b 0 35%,#4a3f6b 35% 50%,#2c2e36 50% 100%)}
   .zombie .art{background:linear-gradient(#070b1a,#26304f 55%,#1c2a22 55%,#253a2a)}
   .art span{position:relative;z-index:1;margin-bottom:10px;filter:drop-shadow(0 4px 10px rgba(0,0,0,.5))}
   .word{position:absolute;z-index:2;background:rgba(10,12,18,.8);color:#fff;font:700 14px 'JetBrains Mono',monospace;padding:4px 8px;border-radius:7px}
@@ -60,6 +61,11 @@
       <div class="body"><h2>Word Zombies</h2><p>Hold the barricade. Type the word over each zombie to take it down before it breaks through.</p>
         <div class="meta"><span class="best" id="bZombie"></span><span class="play">Play</span></div></div>
     </a>
+    <a class="game hop" href="hop">
+      <div class="art"><span>🐸</span><div class="word" style="top:20px;left:50%;transform:translateX(-50%)">↑ <b>ju</b>mp</div><div class="word" style="bottom:22px;left:22px">← log</div><div class="word" style="bottom:22px;right:22px">→ lake</div></div>
+      <div class="body"><h2>Word Hopper</h2><p>Type the word on an arrow to hop. Dodge traffic, ride logs across the river and get every frog home.</p>
+        <div class="meta"><span class="best" id="bHop"></span><span class="play">Play</span></div></div>
+    </a>
   </div>
   <footer>Works on phones and computers. Your best scores are saved on this device.</footer>
 </main>
@@ -68,6 +74,7 @@ function g(k){try{return localStorage.getItem(k)}catch(e){return null}}
 var r=["kr_best_easy","kr_best_med","kr_best_hard"].map(function(k){return parseFloat(g(k)||"0")}).filter(Boolean);
 if(r.length)document.getElementById("bRace").textContent="Best "+Math.min.apply(null,r).toFixed(2)+"s";
 if(+g("tk_best_space"))document.getElementById("bSpace").textContent="Best "+g("tk_best_space");
+if(+g("tk_best_hop"))document.getElementById("bHop").textContent="Best "+g("tk_best_hop");
 if(+g("tk_best_zombie"))document.getElementById("bZombie").textContent="Best "+g("tk_best_zombie");
 </script>
 </body>

@@ -75,9 +75,9 @@ function makeTyper(){
     release(){if(this.target){this.target.typed=0;this.target=null}}};
 }
 
-function renderTyped(el,typer){
+function renderTyped(el,typer,ph){
   const t=typer.target;
-  el.innerHTML=t&&t.alive?`<span class="ok">${t.word.slice(0,t.typed)}</span><span class="rest">${t.word.slice(t.typed)}</span>`:'<span class="ph">Type any word you see · space to switch targets</span>';
+  el.innerHTML=t&&t.alive?`<span class="ok">${t.word.slice(0,t.typed)}</span><span class="rest">${t.word.slice(t.typed)}</span>`:`<span class="ph">${ph||"Type a word you see"}</span>`;
 }
 
 // Typing stats. WPM counts only time you're actually typing (gaps over 1.5s, like waiting

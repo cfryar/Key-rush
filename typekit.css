@@ -9,7 +9,7 @@ canvas{display:block;width:100%;height:100%}
 .pill{background:rgba(10,12,18,.62);backdrop-filter:blur(4px);border-radius:10px;padding:6px 10px;font-weight:700;color:#fff;text-decoration:none;border:0;font-size:15px;font-family:inherit}
 a.pill,button.pill{pointer-events:auto;cursor:pointer}
 .mult{color:var(--accent)}
-.typedbar{height:52px;flex:0 0 52px;background:var(--panel);border-top:1px solid var(--line);display:flex;align-items:center;justify-content:center;font:700 24px 'JetBrains Mono',monospace;letter-spacing:.08em;position:relative;cursor:text}
+.typedbar{height:52px;flex:0 0 52px;padding:0 80px;text-align:center;background:var(--panel);border-top:1px solid var(--line);display:flex;align-items:center;justify-content:center;font:700 24px 'JetBrains Mono',monospace;letter-spacing:.08em;position:relative;cursor:text}
 .typedbar .ok{color:var(--accent)}.typedbar .rest{color:#6d7380}.typedbar .ph{color:var(--dim);font:600 14px Inter,sans-serif;letter-spacing:0}
 .tstat{position:absolute;right:12px;top:50%;transform:translateY(-50%);font:700 12px 'JetBrains Mono',monospace;color:var(--dim);letter-spacing:0;text-align:right;line-height:1.35}
 .tstat b{color:var(--text)}
